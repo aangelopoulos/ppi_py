@@ -110,4 +110,16 @@ def ppi_quantile_ci( Y, Yhat, Yhat_unlabeled, q, alpha=0.05 ):
     return grid[rectified_p_value > alpha][[0, -1]]
 
 if __name__ == "__main__":
-    print("Success!")
+    # Write a test for ppi_mean_ci, calculating the fraction of times 0 is included
+    trials = 1000
+    alpha = 0.05
+    included = 0
+    for i in range(trials):
+        Y = np.random.normal(0, 1, 1000)
+        Yhat = np.random.normal(0, 1, 1000)
+        Yhat_unlabeled = np.random.normal(0, 1, 1000)
+        ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alpha)
+        if ci[0] <= 0 and ci[1] >= 0:
+            included += 1
+    print(included / trials)
+    assert included / trials >= 1 - alpha
