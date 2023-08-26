@@ -1,0 +1,24 @@
+[tool.black]
+line-length = 79
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+  )/
+  | .*_test\.py
+)
+'''
+
+[tool.pytest.ini-options]
+minversion = "6.0"
+addopts = "--doctest-modules"
+testpaths = ["tests"]
