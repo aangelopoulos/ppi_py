@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.stats import norm
+from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from .utils import dataframe_decorator
 
@@ -9,9 +11,9 @@ def _rectified_mean(rectifier, imputed_mean):
 
     Parameters
     ----------
-    rectifier : float
+    rectifier : float or ndarray
         The rectifier value.
-    imputed_mean : float
+    imputed_mean : float or ndarray
         The imputed mean.
     """
     return imputed_mean + rectifier
@@ -30,13 +32,13 @@ def _rectified_ci(
 
     Parameters
     ----------
-    rectifier : float
+    rectifier : float or ndarray
         The rectifier value.
-    rectifier_std : float
+    rectifier_std : float or ndarray
         The rectifier standard deviation.
-    imputed_mean : float
+    imputed_mean : float or ndarray
         The imputed mean.
-    imputed_std : float
+    imputed_std : float or ndarray
         The imputed standard deviation.
     alpha : float
         The confidence level.
@@ -61,13 +63,13 @@ def _rectified_p_value(
 
     Parameters
     ----------
-    rectifier : float
+    rectifier : float or ndarray
         The rectifier value.
-    rectifier_std : float
+    rectifier_std : float or ndarray
         The rectifier standard deviation.
-    imputed_mean : float
+    imputed_mean : float or ndarray
         The imputed mean.
-    imputed_std : float
+    imputed_std : float or ndarray
         The imputed standard deviation.
     """
     rectified_point_estimate = imputed_mean + rectifier
@@ -87,7 +89,7 @@ def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled):
     return _rectified_mean((Y - Yhat).mean(), Yhat_unlabeled.mean())
 
 
-def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.05, alternative="two-sided"):
+def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     return _rectified_ci(
@@ -138,26 +140,21 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid):
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
-def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, num_grid=1000):
-    grid = np.linspace(
-        min(Y.min(), Yhat.min(), Yhat_unlabeled.min()),
-        max(Y.max(), Yhat.max(), Yhat_unlabeled.max()),
-        num_grid,
-    )
+def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q):
+    assert len(Y.shape) == 1
+    grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
+    grid = np.sort(grid)
     rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid)
     return grid[np.argmin(np.abs(rectified_cdf - q))][
         0
     ]  # Find the intersection of the rectified CDF and the quantile
 
 
-def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.05):
+def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1):
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    grid = np.linspace(
-        min(Y.min(), Yhat.min(), Yhat_unlabeled.min()),
-        max(Y.max(), Yhat.max(), Yhat_unlabeled.max()),
-        1000,
-    )
+    grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
+    grid = np.sort(grid)
     cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = _compute_cdf(
         Yhat_unlabeled, grid
     )
@@ -173,3 +170,38 @@ def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.05):
     )
     # Return the min and max values of the grid where p > alpha
     return grid[rectified_p_value > alpha][[0, -1]]
+
+
+"""
+    ORDINARY LEAST SQUARES
+
+"""
+
+
+def _ols(X, Y, return_se=False):
+    regression = OLS(Y, exog=X).fit()
+    theta = regression.params
+    if return_se:
+        return theta, regression.HC0_se
+    else:
+        return theta
+
+def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
+    imputed_theta = _ols(X_unlabeled, Yhat_unlabeled)
+    rectifier = _ols(X, Y - Yhat)
+    return imputed_theta + rectifier
+
+def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    imputed_theta, imputed_se = _ols(X_unlabeled, Yhat_unlabeled, return_se=True)
+    rectifier, rectifier_se = _ols(X, Y - Yhat, return_se=True)
+    return _rectified_ci(
+        imputed_theta,
+        imputed_se,
+        rectifier,
+        rectifier_se,
+        alpha,
+        alternative="two-sided",
+    )
+
