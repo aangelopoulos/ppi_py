@@ -1,5 +1,6 @@
 import numpy as np
 from ppi_py import *
+from tqdm import tqdm
 
 """
     PPI tests
@@ -30,13 +31,13 @@ def test_ppi_quantile_ci():
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
     epsilon = 0.1
     n = 1000
-    N = 10000
+    N = 1000
     bias = 2
     sigma = 0.1
     q = 0.75
     includeds = np.zeros_like(alphas)
     true_quantile = np.random.normal(0,1)
-    for i in range(trials):
+    for i in tqdm(range(trials)):
         binary_vector = 2*np.random.binomial(1,1-q, n)-1
         binary_vector_unlabeled = 2*np.random.binomial(1,1-q, N)-1
         Y = true_quantile + np.abs(np.random.normal(0,1,n))*binary_vector

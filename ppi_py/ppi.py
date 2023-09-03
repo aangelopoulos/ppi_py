@@ -76,7 +76,7 @@ def _rectified_p_value(
         The imputed standard deviation.
     """
     rectified_point_estimate = imputed_mean + rectifier
-    rectified_std = np.sqrt(imputed_std**2 + rectifier_std**2)
+    rectified_std = np.maximum(np.sqrt(imputed_std**2 + rectifier_std**2), 1e-16)
     return _zstat_generic(
         rectified_point_estimate, 0, rectified_std, alternative, null
     )[1]
