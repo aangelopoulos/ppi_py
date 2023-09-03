@@ -1,10 +1,37 @@
-name: Lint
+name: Auto-format with Black
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  lint:
+  auto-format:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: psf/black@stable
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - name: Install Black
+      run: |
+        python -m pip install --upgrade pip
+        pip install black
+
+    - name: Run Black
+      run: |
+        black .
+
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git commit -m "Auto-format with Black" || echo "No changes to commit"
+        git push

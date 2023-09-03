@@ -31,7 +31,9 @@ def test_ppi_ols_pointestimate():
 
 
 def test_ppi_ols_ci():
+
     n = 1000
+
     N = 10000
     d = 1
     alphas = np.array([0.05, 0.1, 0.2])
@@ -49,7 +51,6 @@ def test_ppi_ols_ci():
         X_unlabeled = np.random.randn(N, d)
         Yhat_unlabeled = X_unlabeled.dot(beta_prediction) + np.random.randn(N)
         for j in range(alphas.shape[0]):
-
             # Compute the confidence interval
             beta_ppi_ci = ppi_ols_ci(
                 X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j]
