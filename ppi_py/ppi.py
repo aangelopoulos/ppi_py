@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.stats import norm
+from scipy.special import expit
 from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
+from sklearn.linear_model import LogisticRegression
 from .utils import dataframe_decorator
 
 
@@ -115,6 +117,37 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
     )
 
 
+def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
+    n = Y.shape[0]
+    return _zconfint_generic(
+         Y.mean(), Y.std / np.sqrt(n) , alpha, alternative
+    )
+
+
+def semisupervised_mean_ci(X, Y, X_unlabeled, K, alpha=0.1, alternative="two-sided"):
+    n = Y.shape[0]
+    N = X_unlabeled.shape[0]
+    fold_size = int(n/K)
+    Yhat = np.zeros(n)
+    Yhat_unlabeled = np.zeros(N)
+    for j in range(K):
+        fold_indices = range(j*fold_size,(j+1)*fold_size)
+        train_indices = np.delete(range(n), fold_indices)
+        X_train = X[train_indices,:]
+        Y_train = Y[train_indices]
+        beta_fold = _ols(X_train, Y_train)
+        X_fold = X[fold_indices,:]
+        Y_fold = Y[fold_indices]
+        Yhat[fold_indices] = X_fold @ beta_fold
+        Yhat_unlabeled += (X_unlabeled @ beta_fold)/K
+    semisupervised_pointest = Yhat_unlabeled.mean() + (Y - Yhat).mean()
+    se = ((Y - Yhat)**2).mean()/np.sqrt(n)
+    return _zconfint_generic(
+          semisupervised_pointest, se, alpha, alternative
+     )
+
+
+
 """
     QUANTILE ESTIMATION
 
@@ -172,6 +205,15 @@ def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1):
     return grid[rectified_p_value > alpha][[0, -1]]
 
 
+ def classical_quantile_ci(Y, q, alpha=0.1):
+    n = Y.shape[0]
+    lower, upper = _zconfint_generic(
+          q*n, np.sqrt(q*(1-q)*n), alpha, "two-sided"
+      )
+    sorted_Y = np.sort(Y)
+    return sorted_Y[int(lower)], sorted_Y[int(upper)]
+
+
 """
     ORDINARY LEAST SQUARES
 
@@ -186,10 +228,12 @@ def _ols(X, Y, return_se=False):
     else:
         return theta
 
+
 def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
     imputed_theta = _ols(X_unlabeled, Yhat_unlabeled)
     rectifier = _ols(X, Y - Yhat)
     return imputed_theta + rectifier
+
 
 def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
     n = Y.shape[0]
@@ -204,4 +248,77 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
         alpha,
         alternative="two-sided",
     )
+
+
+def classical_ols_ci(X, Y, alpha=0.1, alternative="two-sided"):
+    n = Y.shape[0]
+    pointest, se = _ols(X, Y, return_se=True)
+    return _zconfint_generic(
+         pointest, se, alpha, alternative
+     )
+
+
+ """
+     LOGISTIC REGRESSION
+
+ """
+
+def _logistic(X, Y):
+    regression = LogisticRegression(penalty='none', solver='lbfgs', max_iter=10000, tol=1e-15, fit_intercept=False).fit(X,Y)
+    return regression.coef_.squeeze()
+
+
+ def ppi_logistic_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1,  grad_steps=5000):
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    rectifier = 1/n * X.T @ (Yhat - Y)
+    theta = np.zeros(d)
+    mu_theta = expit(X_unlabeled@theta)
+    for i in range(grad_steps):
+        mu_theta = expit(X_unlabeled@theta)
+        grad = 1/N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled) + rectifier
+        theta -=  step_size * grad
+    return theta
+
+
+ def ppi_logistic_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, grid_size=10000, grid_radius=1):
+    n = Y.shape[0]
+    d = X_labeled.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    ppi_pointest = ppi_logistic_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
+    rectifier = 1/n * X.T @ (Yhat - Y)
+    rectifier_std = np.std(X * (Yhat - Y)[:,None], axis=0)
+    confset = []
+    grid_edge_accepted = True
+    while len(confset) == 0 or grid_edge_accepted = True:
+        theta_grid = np.concatenate([
+            np.linspace(ppi_pointest - grid_radius*np.ones(d), ppi_pointest, grid_size//2),
+            np.linspace(ppi_pointest, ppi_pointest + grid_radius*np.ones(d), grid_size//2)[1:]
+        ])
+        mu_theta = expit(X_unlabeled@theta_grid.T)
+        grad = 1/N * X_unlabeled.T@(mu_theta - Yhat_unlabeled[:, None])
+        prederr_std = np.std(X_unlabeled[:,:,None]*(mu_theta - Yhat_unlabeled[:,None])[:,None,:], axis=0)
+        w = norm.ppf(1-alpha/(2*d)) * np.sqrt(rectifier_std[:,None]**2/n + prederr_std**2/N)
+        accept = np.all( np.abs(grad + rectifier[:,None]) <= w, axis=0)
+        confset = theta_grid[accept]
+        grid_edge_accepted = accept[0] or accept[-1]
+        grid_radius *= 2
+        grid_size *= 2
+    return confset.min(axis=0), confset.max(axis=0)
+
+
+def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
+    n = Y.shape[0]
+    pointest = _logistic(X,Y)
+    mu = expit(X @ pointest)
+    D = np.diag(np.multiply(mu, 1 - mu))
+    V = 1/n * X.T @ D @ X
+    V_inv = np.linalg.inv(V)
+    grads = np.diag(mu - Y) @ X
+    cov_mat = V_inv @ np.cov(grads.T) @ V_inv
+    return  _zconfint_generic(
+          pointest, np.sqrt(np.diag(cov_mat)/n), alpha, alternative
+      )
+
 
