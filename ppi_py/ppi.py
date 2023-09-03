@@ -5,6 +5,7 @@ from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import dataframe_decorator
+import pdb
 
 
 def _rectified_mean(rectifier, imputed_mean):
@@ -124,13 +125,13 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
 
 
 def _compute_cdf(Y, grid):
-    indicators = Y[:, None] <= grid[None, :]
+    indicators = (Y[:, None] <= grid[None, :]).astype(float)
     return indicators.mean(axis=0), indicators.std(axis=0)
 
 
 def _compute_cdf_diff(Y, Yhat, grid):
-    indicators_Y = Y[:, None] <= grid[None, :]
-    indicators_Yhat = Y[:, None] <= grid[None, :]
+    indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
+    indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
     return (indicators_Y - indicators_Yhat).mean(axis=0), (
         indicators_Y - indicators_Yhat
     ).std(axis=0)
@@ -147,9 +148,9 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q):
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
     grid = np.sort(grid)
     rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid)
-    return grid[np.argmin(np.abs(rectified_cdf - q))][
-        0
-    ]  # Find the intersection of the rectified CDF and the quantile
+    minimizers = np.argmin(np.abs(rectified_cdf - q))
+    minimizer = minimizers if isinstance(minimizers, (int, np.int64)) else minimizers[0]
+    return grid[minimizer] # Find the intersection of the rectified CDF and the quantile
 
 
 def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1):
