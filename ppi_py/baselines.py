@@ -15,7 +15,7 @@ from .ppi import _ols
 
 def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
     n = Y.shape[0]
-    return _zconfint_generic(Y.mean(), Y.std / np.sqrt(n), alpha, alternative)
+    return _zconfint_generic(Y.mean(), Y.std() / np.sqrt(n), alpha, alternative)
 
 
 def semisupervised_mean_ci(
