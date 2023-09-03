@@ -76,7 +76,9 @@ def _rectified_p_value(
         The imputed standard deviation.
     """
     rectified_point_estimate = imputed_mean + rectifier
-    rectified_std = np.maximum(np.sqrt(imputed_std**2 + rectifier_std**2), 1e-16)
+    rectified_std = np.maximum(
+        np.sqrt(imputed_std**2 + rectifier_std**2), 1e-16
+    )
     return _zstat_generic(
         rectified_point_estimate, 0, rectified_std, alternative, null
     )[1]
@@ -149,8 +151,14 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q):
     grid = np.sort(grid)
     rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid)
     minimizers = np.argmin(np.abs(rectified_cdf - q))
-    minimizer = minimizers if isinstance(minimizers, (int, np.int64)) else minimizers[0]
-    return grid[minimizer] # Find the intersection of the rectified CDF and the quantile
+    minimizer = (
+        minimizers
+        if isinstance(minimizers, (int, np.int64))
+        else minimizers[0]
+    )
+    return grid[
+        minimizer
+    ]  # Find the intersection of the rectified CDF and the quantile
 
 
 def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1):

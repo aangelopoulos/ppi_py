@@ -6,6 +6,7 @@ from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import dataframe_decorator
 from .ppi import _ols
+import pdb
 
 """
     MEAN ESTIMATION
@@ -78,6 +79,17 @@ def semisupervised_mean_ci(
         semisupervised_pointest, se / np.sqrt(n), alpha, alternative
     )
 
+# Make a conformal interval for each unlabeled sample and average. Only valid with bonferroni=True
+def conformal_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, bonferroni=True):
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    scores = np.abs(Y - Yhat)
+    level = (1-alpha/N)*(1+1/n) if bonferroni else (1-alpha)*(1+1/n)
+    if level >= 1:
+        return -np.infty, np.infty
+    conformal_quantile = np.quantile(scores, level, method='higher')
+    imputed_estimate = Yhat_unlabeled.mean()
+    return  imputed_estimate - conformal_quantile, imputed_estimate + conformal_quantile
 
 """
     QUANTILE ESTIMATION

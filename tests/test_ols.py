@@ -31,7 +31,6 @@ def test_ppi_ols_pointestimate():
 
 
 def test_ppi_ols_ci():
-
     n = 1000
 
     N = 10000
