@@ -227,7 +227,7 @@ def ppi_logistic_pointestimate(
     rectifier = 1 / n * X.T @ (Yhat - Y)
     theta = np.zeros(d)
     mu_theta = expit(X_unlabeled @ theta)
-    grad = grad_tol*np.ones(d) + 1 # Initialize to enter while loop
+    grad = grad_tol * np.ones(d) + 1  # Initialize to enter while loop
     while np.linalg.norm(grad) > grad_tol:
         mu_theta = expit(X_unlabeled @ theta)
         grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled) + rectifier

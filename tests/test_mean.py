@@ -5,28 +5,30 @@ from ppi_py import *
     PPI tests
 """
 
+
 def test_ppi_mean_pointestimate():
     Y = np.random.normal(0, 1, 100)
     Yhat = Y + 2
     Yhat_unlabeled = np.ones(10000) * 2
     assert ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled) == 0
 
+
 def test_ppi_mean_ci():
     trials = 10000
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
     epsilon = 0.02
-    failed = False
-    for alpha in alphas:
-        included = 0
-        for i in range(trials):
-            Y = np.random.normal(0, 1, 10000)
-            Yhat = np.random.normal(-2, 1, 10000)
-            Yhat_unlabeled = np.random.normal(-2, 1, 10000)
-            ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alpha)
+    includeds = np.zeros_like(alphas)
+    for i in range(trials):
+        Y = np.random.normal(0, 1, 10000)
+        Yhat = np.random.normal(-2, 1, 10000)
+        Yhat_unlabeled = np.random.normal(-2, 1, 10000)
+        for j in range(alphas.shape[0]):
+            ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alphas[j])
             if ci[0] <= 0 and ci[1] >= 0:
-                included += 1
-        failed = failed | (included / trials < 1 - alpha - epsilon)
+                includeds[j] += 1
+    failed = np.any(includeds / trials < 1 - alphas - epsilon)
     assert not failed
+
 
 def test_ppi_mean_pval():
     trials = 10000
@@ -42,6 +44,7 @@ def test_ppi_mean_pval():
         rejected += pval < alphas
     failed = rejected / trials > alphas + epsilon
     assert not np.any(failed)
+
 
 """
     Classical tests
@@ -62,26 +65,28 @@ def test_classical_mean_ci():
     failed = np.any(includeds / trials < 1 - alphas - epsilon)
     assert not failed
 
+
 def test_semisupervised_mean_ci():
     trials = 1000
-    K = 10
-    d = 5 # Dimension of _features_ (not mean)
+    K = 5
+    d = 2  # Dimension of _features_ (not mean)
     n = 1000
     N = 10000
     sigma = 1
+    mu = 10
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
     epsilon = 0.05
     includeds = np.zeros_like(alphas)
     for i in range(trials):
-        X = np.random.normal(0,1,size=(n, d))
-        X_unlabeled = np.random.normal(0,1,size=(N,d))
-        theta = np.random.normal(0,1,size=d)
+        X = np.random.normal(0, 1, size=(n, d))
+        X_unlabeled = np.random.normal(0, 1, size=(N, d))
+        theta = np.random.normal(0, 1, size=d)
         theta /= np.linalg.norm(theta)
-        Y = X.dot(theta) + sigma*np.random.normal(0, 1, n)
+        Y = X.dot(theta) + sigma * np.random.normal(0, 1, n) + mu
         for j in range(alphas.shape[0]):
             ci = semisupervised_mean_ci(X, Y, X_unlabeled, K, alpha=alphas[j])
-            if ci[0] <= 0 and ci[1] >= 0:
+            if ci[0] <= mu and ci[1] >= mu:
                 includeds[j] += 1
-    print( includeds/trials )
+    print(includeds / trials)
     failed = np.any(includeds / trials < 1 - alphas - epsilon)
     assert not failed

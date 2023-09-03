@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def dataframe_decorator(func):
     def wrapper(
         data=None,

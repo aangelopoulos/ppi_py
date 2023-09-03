@@ -9,6 +9,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
     PPI tests
 """
 
+
 def test_ppi_logistic_pointestimate_debias():
     # Make a synthetic regression problem
     n = 1000
@@ -21,11 +22,18 @@ def test_ppi_logistic_pointestimate_debias():
     Yhat = expit(X.dot(beta_prediction) + np.random.randn(n))
     # Make a synthetic unlabeled data set with predictions Yhat
     X_unlabeled = np.random.randn(N, d)
-    Yhat_unlabeled = expit(X_unlabeled.dot(beta_prediction) + np.random.randn(N))
+    Yhat_unlabeled = expit(
+        X_unlabeled.dot(beta_prediction) + np.random.randn(N)
+    )
     # Compute the point estimate
-    beta_ppi_pointestimate = ppi_logistic_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
+    beta_ppi_pointestimate = ppi_logistic_pointestimate(
+        X, Y, Yhat, X_unlabeled, Yhat_unlabeled
+    )
     # Check that the point estimate is close to the true beta
-    assert np.linalg.norm(beta_ppi_pointestimate - beta) < np.linalg.norm(beta_prediction - beta) # Makes it less biased
+    assert np.linalg.norm(beta_ppi_pointestimate - beta) < np.linalg.norm(
+        beta_prediction - beta
+    )  # Makes it less biased
+
 
 def test_ppi_logistic_pointestimate_recovers():
     # Make a synthetic regression problem
@@ -34,15 +42,18 @@ def test_ppi_logistic_pointestimate_recovers():
     d = 3
     X = np.random.randn(n, d)
     beta = np.random.randn(d)
-    Y = np.random.binomial(1,expit(X.dot(beta)))
+    Y = np.random.binomial(1, expit(X.dot(beta)))
     Yhat = expit(X.dot(beta))
     # Make a synthetic unlabeled data set with predictions Yhat
     X_unlabeled = np.random.randn(N, d)
     Yhat_unlabeled = expit(X_unlabeled.dot(beta))
     # Compute the point estimate
-    beta_ppi_pointestimate = ppi_logistic_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
+    beta_ppi_pointestimate = ppi_logistic_pointestimate(
+        X, Y, Yhat, X_unlabeled, Yhat_unlabeled
+    )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
+
 
 def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     includeds = np.zeros(len(alphas))
@@ -57,10 +68,15 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     Yhat_unlabeled = expit(X_unlabeled.dot(beta_prediction))
     # Compute the confidence interval
     for j in range(len(alphas)):
-        beta_ppi_ci = ppi_logistic_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j])
+        beta_ppi_ci = ppi_logistic_ci(
+            X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j]
+        )
         # Check that the confidence interval contains the true beta
-        includeds[j] += int((beta_ppi_ci[0][0] <= beta[0]) & (beta[0] <= beta_ppi_ci[1][0]))
+        includeds[j] += int(
+            (beta_ppi_ci[0][0] <= beta[0]) & (beta[0] <= beta_ppi_ci[1][0])
+        )
     return includeds
+
 
 def test_ppi_logistic_ci_parallel():
     n = 1000
@@ -73,7 +89,12 @@ def test_ppi_logistic_ci_parallel():
     total_includeds = np.zeros(len(alphas))
 
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(ppi_logistic_ci_subtest, i, alphas, n, N, d, epsilon) for i in range(num_trials)]
+        futures = [
+            executor.submit(
+                ppi_logistic_ci_subtest, i, alphas, n, N, d, epsilon
+            )
+            for i in range(num_trials)
+        ]
 
         for future in tqdm(as_completed(futures), total=len(futures)):
             total_includeds += future.result()
@@ -82,9 +103,11 @@ def test_ppi_logistic_ci_parallel():
     failed = np.any((total_includeds / num_trials) < (1 - alphas - epsilon))
     assert not failed
 
+
 """
     Baseline tests
 """
+
 
 def classical_logistic_ci_subtest(i, alphas, n, d, epsilon):
     includeds = np.zeros(len(alphas))
@@ -96,8 +119,11 @@ def classical_logistic_ci_subtest(i, alphas, n, d, epsilon):
     for j in range(len(alphas)):
         beta_ci = classical_logistic_ci(X, Y, alpha=alphas[j])
         # Check that the confidence interval contains the true beta
-        includeds[j] += int((beta_ci[0][0] <= beta[0]) & (beta[0] <= beta_ci[1][0]))
+        includeds[j] += int(
+            (beta_ci[0][0] <= beta[0]) & (beta[0] <= beta_ci[1][0])
+        )
     return includeds
+
 
 def test_classical_logistic_ci_parallel():
     n = 1000
@@ -109,7 +135,12 @@ def test_classical_logistic_ci_parallel():
     total_includeds = np.zeros(len(alphas))
 
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(classical_logistic_ci_subtest, i, alphas, n, d, epsilon) for i in range(num_trials)]
+        futures = [
+            executor.submit(
+                classical_logistic_ci_subtest, i, alphas, n, d, epsilon
+            )
+            for i in range(num_trials)
+        ]
 
         for future in tqdm(as_completed(futures), total=len(futures)):
             total_includeds += future.result()

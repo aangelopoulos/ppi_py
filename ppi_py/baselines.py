@@ -15,17 +15,37 @@ from .ppi import _ols
 
 def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
     n = Y.shape[0]
-    return _zconfint_generic(Y.mean(), Y.std() / np.sqrt(n), alpha, alternative)
+    return _zconfint_generic(
+        Y.mean(), Y.std() / np.sqrt(n), alpha, alternative
+    )
 
 
 def semisupervised_mean_ci(
-    X, Y, X_unlabeled, K, alpha=0.1, alternative="two-sided"
+    X,
+    Y,
+    X_unlabeled,
+    K,
+    alpha=0.1,
+    alternative="two-sided",
+    add_intercept=True,
 ):
+    if add_intercept:
+        X = np.concatenate([np.ones((X.shape[0], 1)), X], axis=1)
+        X_unlabeled = np.concatenate(
+            [np.ones((X_unlabeled.shape[0], 1)), X_unlabeled], axis=1
+        )
     n = Y.shape[0]
     N = X_unlabeled.shape[0]
     fold_size = int(n / K)
     Yhat = np.zeros(n)
     Yhat_unlabeled = np.zeros(N)
+    muhat = X_unlabeled.mean(axis=0)
+    Vhat = X_unlabeled - muhat[None, :]
+    Chat = Vhat.T.dot(Vhat) / N
+    epsilon_hats = np.zeros(n)
+    bhat_squareds = np.zeros(K)
+    betahat_transpose_Vhat_fold_avg = np.zeros((K,))
+    bhat_squared_fold = np.zeros((K,))
     for j in range(K):
         fold_indices = range(j * fold_size, (j + 1) * fold_size)
         train_indices = np.delete(range(n), fold_indices)
@@ -34,11 +54,29 @@ def semisupervised_mean_ci(
         beta_fold = _ols(X_train, Y_train)
         X_fold = X[fold_indices, :]
         Y_fold = Y[fold_indices]
+        Vhat_fold = Vhat[fold_indices]
         Yhat[fold_indices] = X_fold @ beta_fold
         Yhat_unlabeled += (X_unlabeled @ beta_fold) / K
+        epsilon_hats[fold_indices] = Y_fold - beta_fold.dot(Vhat_fold.T)
+        bhat_squared_fold[j] = (
+            beta_fold.dot(Chat).dot(beta_fold)
+            + 2
+            * (beta_fold.dot(Vhat_fold.T) * epsilon_hats[fold_indices]).mean()
+        )
+        betahat_transpose_Vhat_fold_avg[j] = (
+            2 * beta_fold.dot(Vhat_fold.T).mean()
+        )
     semisupervised_pointest = Yhat_unlabeled.mean() + (Y - Yhat).mean()
-    se = ((Y - Yhat) ** 2).mean() / np.sqrt(n)
-    return _zconfint_generic(semisupervised_pointest, se, alpha, alternative)
+    epsilon_hats -= semisupervised_pointest
+    bhat_squared_fold -= (
+        betahat_transpose_Vhat_fold_avg * semisupervised_pointest
+    )
+    bhat_squared = bhat_squared_fold.mean()
+    sigmahat_squared_epsilon = (epsilon_hats**2).mean()
+    se = np.sqrt(sigmahat_squared_epsilon + n / N * bhat_squared)
+    return _zconfint_generic(
+        semisupervised_pointest, se / np.sqrt(n), alpha, alternative
+    )
 
 
 """
