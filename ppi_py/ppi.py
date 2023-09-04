@@ -145,10 +145,13 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid):
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
-def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q):
+def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
     assert len(Y.shape) == 1
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
-    grid = np.sort(grid)
+    if exact_grid:
+        grid = np.sort(grid)
+    else:
+        grid = np.linspace(grid.min(), grid.max(), 5000)
     rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid)
     minimizers = np.argmin(np.abs(rectified_cdf - q))
     minimizer = (
@@ -161,11 +164,14 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q):
     ]  # Find the intersection of the rectified CDF and the quantile
 
 
-def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1):
+def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False):
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
-    grid = np.sort(grid)
+    if exact_grid:
+        grid = np.sort(grid)
+    else:
+        grid = np.linspace(grid.min(), grid.max(), 5000)
     cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = _compute_cdf(
         Yhat_unlabeled, grid
     )
