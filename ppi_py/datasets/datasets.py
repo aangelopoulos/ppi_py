@@ -29,7 +29,7 @@ def load_dataset(dataset_folder, dataset_name, download=True):
     }
     if dataset_name not in dataset_google_drive_ids.keys():
         raise NotImplementedError(
-            f"The dataset {dataset_name} is not implemented. Valid options are {list(dataset_goole_drive_ids.keys())}."
+            f"The dataset {dataset_name} is not implemented. Valid options are {list(dataset_google_drive_ids.keys())}."
         )
     dataset_path = os.path.join(dataset_folder, dataset_name + ".npz")
     if not os.path.exists(dataset_path):

@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import pdb
 
 def plot_interval(
     ax,
@@ -152,6 +152,7 @@ def make_plots(
     classical_widths = [
         df[(df.n == _n) & (df.method == "Classical")].width.mean() for _n in ns
     ]
+    
     axs[2].plot(
         ns,
         ppi_widths,
@@ -171,7 +172,7 @@ def make_plots(
     ppi_width_list = []
     classical_width_list = []
     for _n in ns:
-        trials = np.random.choice(num_trials, size=num_scatter).astype(int)
+        trials = np.random.choice(num_trials, size=num_scatter, replace=False).astype(int)
         ppi_width_list += df[
             (df.n == _n) & (df.method == "PPI") & df.trial.isin(trials)
         ].width.to_list()
@@ -179,7 +180,7 @@ def make_plots(
             (df.n == _n) & (df.method == "Classical") & df.trial.isin(trials)
         ].width.to_list()
         n_list += [_n] * num_scatter
-
+        
     axs[2].scatter(n_list, ppi_width_list, color=ppi_strokecolor, alpha=0.5)
 
     axs[2].scatter(
