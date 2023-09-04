@@ -91,6 +91,7 @@ def test_semisupervised_mean_ci():
     failed = np.any(includeds / trials < 1 - alphas - epsilon)
     assert not failed
 
+
 def test_conformal_mean_ci():
     trials = 10000
     n = 1000
@@ -102,10 +103,10 @@ def test_conformal_mean_ci():
     epsilon = 0.05
     includeds = np.zeros_like(alphas)
     for i in range(trials):
-        Y = np.random.normal(mu,1,n)
-        Yhat = Y + sigma*np.random.normal(0,1,n) + bias
-        Y_unlabeled = np.random.normal(mu,1,N)
-        Yhat_unlabeled = Y_unlabeled + sigma*np.random.normal(0,1,N) + bias
+        Y = np.random.normal(mu, 1, n)
+        Yhat = Y + sigma * np.random.normal(0, 1, n) + bias
+        Y_unlabeled = np.random.normal(mu, 1, N)
+        Yhat_unlabeled = Y_unlabeled + sigma * np.random.normal(0, 1, N) + bias
         for j in range(alphas.shape[0]):
             ci = conformal_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alphas[j])
             if ci[0] <= mu and ci[1] >= mu:
