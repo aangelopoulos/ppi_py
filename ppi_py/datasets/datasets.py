@@ -17,10 +17,11 @@ def load_dataset(dataset_folder, dataset_name, download=True):
     dataset_google_drive_ids = {
             "alphafold" : "1lOhdSJEcFbZmcIoqmlLxo3LgLG1KqPho",
             "ballots": "1DJvTWvPM6zQD0V4yGH1O7DL3kfnTE06u",
-            "census": None,
-            "forest": None,
+            "census_income": None,
+            "census_healthcare": None,
+            "forest": "1Vqi1wSmVnWh_2lLQuDwrhkGcipvoWBc0",
             "galaxy": None,
-            "gene_expression": None,
+            "gene_expression": "17PwlvAAKeBYGLXPz9L2LVnNJ66XjuyZd",
             "plankton": None
     }
     if dataset_name not in dataset_google_drive_ids.keys():
