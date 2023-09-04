@@ -18,8 +18,8 @@ def load_dataset(dataset_folder, dataset_name, download=True):
     dataset_google_drive_ids = {
             "alphafold" : "1lOhdSJEcFbZmcIoqmlLxo3LgLG1KqPho",
             "ballots": "1DJvTWvPM6zQD0V4yGH1O7DL3kfnTE06u",
-            "census_income": None,
-            "census_healthcare": None,
+            "census_income": "15dZeWw-RTw17-MieG4y1ILTZlreJOmBS",
+            "census_healthcare": "1RjWsnq-gMngRFRj22DvezcdCVl2MxAIX",
             "forest": "1Vqi1wSmVnWh_2lLQuDwrhkGcipvoWBc0",
             "galaxies": "1pDLQesPhbH5fSZW1m4aWC-wnJWnp1rGV",
             "gene_expression": "17PwlvAAKeBYGLXPz9L2LVnNJ66XjuyZd",
