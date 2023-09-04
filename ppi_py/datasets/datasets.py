@@ -23,7 +23,7 @@ def load_dataset(dataset_folder, dataset_name, download=True):
             "forest": "1Vqi1wSmVnWh_2lLQuDwrhkGcipvoWBc0",
             "galaxies": "1pDLQesPhbH5fSZW1m4aWC-wnJWnp1rGV",
             "gene_expression": "17PwlvAAKeBYGLXPz9L2LVnNJ66XjuyZd",
-            "plankton": None
+            "plankton": "1KEk0ZFZ6KiB7_2tdPc5fyBDFNhhJUS_W"
     }
     if dataset_name not in dataset_google_drive_ids.keys():
         raise NotImplementedError(f"The dataset {dataset_name} is not implemented. Valid options are {list(dataset_goole_drive_ids.keys())}.")
