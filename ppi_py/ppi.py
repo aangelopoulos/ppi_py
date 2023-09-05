@@ -288,7 +288,7 @@ def ppi_logistic_ci(
     while ((len(confset) == 0) or (grid_edge_accepted == True)):
         refinements += 1
         if refinements > max_refinements:
-            return -np.infty, np.infty
+            return np.array([-np.infty] * d), np.array([np.infty] * d)
         grid_radius *= 2
         grid_size *= 2
         grid_size = min(grid_size, grid_limit)
@@ -327,7 +327,7 @@ def ppi_logistic_ci(
 
 """
 
-def ppi_distribution_label_shift_ci(Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, counter, return_counts=True):
+def ppi_distribution_label_shift_ci(Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, return_counts=True):
     # Construct the confusion matrix
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
