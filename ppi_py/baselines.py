@@ -3,7 +3,7 @@ from scipy.stats import norm
 from scipy.special import expit
 from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.isotonic import IsotonicRegression
 from .utils import dataframe_decorator
 from .ppi import _ols
@@ -132,21 +132,21 @@ def postprediction_ols_ci(
     Y,
     Yhat,
     X_unlabeled,
-    Yhat_ulabeled,
+    Yhat_unlabeled,
     bootstrap_samples=50,
     alpha=0.1,
     alternative="two-sided",
 ):
     N, d = X_unlabeled.shape
     # fit map to debias predictions
-    iso_reg = IsotonicRegression().fit(Yhat, Y)
+    regression = IsotonicRegression(out_of_bounds='clip').fit(Yhat, Y)#LinearRegression().fit(Yhat[:,None], Y)
     # debias predictions on unlabeled data
-    Yhat_unlabeled_debiased = iso_reg.predict(Yhat_unlabeled)
+    Yhat_unlabeled_debiased = regression.predict(Yhat_unlabeled[:,None])
     # obtain beta and std err via bootstrap
     bootstrap_betas = np.zeros((bootstrap_samples, d))
-    boostrap_ses = np.zeros((bootstrap_samples, d))
+    bootstrap_ses = np.zeros((bootstrap_samples, d))
     for b in range(bootstrap_samples):
-        idx = np.random.choice(range(n), n)
+        idx = np.random.choice(range(N), N)
         X_ols = X_unlabeled[idx, :]
         Y_ols = Yhat_unlabeled_debiased[idx]
         bootstrap_betas[b, :], bootstrap_ses[b, :] = _ols(
