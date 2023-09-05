@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pdb
 
+
 def plot_interval(
     ax,
     lower,
@@ -197,7 +198,9 @@ def make_plots(
     baseline_width_list = []
     classical_width_list = []
     for _n in ns:
-        trials = np.random.choice(num_trials, size=num_scatter, replace=False).astype(int)
+        trials = np.random.choice(
+            num_trials, size=num_scatter, replace=False
+        ).astype(int)
         ppi_width_list += df[
             (df.n == _n) & (df.method == "PPI") & df.trial.isin(trials)
         ].width.to_list()

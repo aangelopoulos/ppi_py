@@ -5,7 +5,12 @@ from scipy.optimize import brentq
 from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
-from .utils import dataframe_decorator, linfty_dkw, linfty_binom, form_discrete_distribution
+from .utils import (
+    dataframe_decorator,
+    linfty_dkw,
+    linfty_binom,
+    form_discrete_distribution,
+)
 import pdb
 
 
@@ -233,6 +238,7 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
 
 """
 
+
 # Todo: Numba accel
 def ppi_logistic_pointestimate(
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1e-3, grad_tol=5e-16
@@ -241,13 +247,17 @@ def ppi_logistic_pointestimate(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     rectifier = 1 / n * X.T @ (Yhat - Y)
-    theta = LogisticRegression(
-        penalty="none",
-        solver="lbfgs",
-        max_iter=10000,
-        tol=1e-15,
-        fit_intercept=False,
-    ).fit(X, Y).coef_.squeeze()
+    theta = (
+        LogisticRegression(
+            penalty="none",
+            solver="lbfgs",
+            max_iter=10000,
+            tol=1e-15,
+            fit_intercept=False,
+        )
+        .fit(X, Y)
+        .coef_.squeeze()
+    )
     mu_theta = expit(X_unlabeled @ theta)
     grad = grad_tol * np.ones(d) + 1  # Initialize to enter while loop
     while np.linalg.norm(grad) > grad_tol:
@@ -269,14 +279,20 @@ def ppi_logistic_ci(
     max_refinements=10,
     grid_radius=1,
     grid_relative=False,
-    step_size=1e-3, # Optimizer step size
-    grad_tol=5e-16 # Optimizer grad tol
+    step_size=1e-3,  # Optimizer step size
+    grad_tol=5e-16,  # Optimizer grad tol
 ):
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     ppi_pointest = ppi_logistic_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=step_size, grad_tol=grad_tol
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        step_size=step_size,
+        grad_tol=grad_tol,
     )
     if grid_relative:
         grid_radius *= ppi_pointest
@@ -285,7 +301,7 @@ def ppi_logistic_ci(
     confset = []
     grid_edge_accepted = True
     refinements = -1
-    while ((len(confset) == 0) or (grid_edge_accepted == True)):
+    while (len(confset) == 0) or (grid_edge_accepted == True):
         refinements += 1
         if refinements > max_refinements:
             return np.array([-np.infty] * d), np.array([np.infty] * d)
@@ -327,16 +343,19 @@ def ppi_logistic_ci(
 
 """
 
-def ppi_distribution_label_shift_ci(Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, return_counts=True):
+
+def ppi_distribution_label_shift_ci(
+    Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, return_counts=True
+):
     # Construct the confusion matrix
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
 
     # Construct column-normalized confusion matrix Ahat
-    C = np.zeros((K,K)).astype(int)
+    C = np.zeros((K, K)).astype(int)
     for j in range(K):
         for l in range(K):
-            C[j,l] = np.bitwise_and(Yhat == j, Y == l).astype(int).sum()
+            C[j, l] = np.bitwise_and(Yhat == j, Y == l).astype(int).sum()
     Ahat = C / C.sum(axis=0)
 
     # Invert Ahat
@@ -344,24 +363,34 @@ def ppi_distribution_label_shift_ci(Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta
     qfhat = form_discrete_distribution(Yhat_unlabeled, sorted_highlow=True)
 
     # Calculate the bound
-    point_estimate = nu@Ahatinv@qfhat
+    point_estimate = nu @ Ahatinv @ qfhat
 
     nmin = C.sum(axis=0).min()
 
-    def invert_budget_split(budget_split): return np.sqrt(1/(4*nmin))*(norm.ppf(1-(budget_split*delta)/(2*K**2)) - norm.ppf((budget_split*delta)/(2*K**2))) - np.sqrt(2/N*np.log(2/((1-budget_split)*delta)))
+    def invert_budget_split(budget_split):
+        return np.sqrt(1 / (4 * nmin)) * (
+            norm.ppf(1 - (budget_split * delta) / (2 * K**2))
+            - norm.ppf((budget_split * delta) / (2 * K**2))
+        ) - np.sqrt(2 / N * np.log(2 / ((1 - budget_split) * delta)))
+
     try:
-        budget_split = brentq(invert_budget_split,1e-9,1-1e-9)
+        budget_split = brentq(invert_budget_split, 1e-9, 1 - 1e-9)
     except:
         budget_split = 0.999999
-    epsilon1 = max([linfty_binom(C.sum(axis=0)[k], K, budget_split*delta, Ahat[:,k]) for k in range(K)])
-    epsilon2 = linfty_dkw(N,K,(1-budget_split)*delta)
+    epsilon1 = max(
+        [
+            linfty_binom(C.sum(axis=0)[k], K, budget_split * delta, Ahat[:, k])
+            for k in range(K)
+        ]
+    )
+    epsilon2 = linfty_dkw(N, K, (1 - budget_split) * delta)
 
     qyhat_lb = np.clip(point_estimate - epsilon1 - epsilon2, 0, 1)
     qyhat_ub = np.clip(point_estimate + epsilon1 + epsilon2, 0, 1)
 
     if return_counts:
-        count_lb = int(binom.ppf((alpha-delta)/2, N, qyhat_lb))
-        count_ub = int(binom.ppf(1-(alpha-delta)/2, N, qyhat_ub))
+        count_lb = int(binom.ppf((alpha - delta) / 2, N, qyhat_lb))
+        count_ub = int(binom.ppf(1 - (alpha - delta) / 2, N, qyhat_ub))
         return count_lb, count_ub
     else:
         return qyhat_lb, qyhat_ub

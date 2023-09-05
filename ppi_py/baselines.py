@@ -128,23 +128,34 @@ def classical_ols_ci(X, Y, alpha=0.1, alternative="two-sided"):
     return _zconfint_generic(pointest, se, alpha, alternative)
 
 
-def postprediction_ols_ci(Y, Yhat, X_unlabeled, Yhat_ulabeled, bootstrap_samples=50, alpha=0.1, alternative="two-sided"):
+def postprediction_ols_ci(
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_ulabeled,
+    bootstrap_samples=50,
+    alpha=0.1,
+    alternative="two-sided",
+):
     N, d = X_unlabeled.shape
     # fit map to debias predictions
     iso_reg = IsotonicRegression().fit(Yhat, Y)
     # debias predictions on unlabeled data
     Yhat_unlabeled_debiased = iso_reg.predict(Yhat_unlabeled)
     # obtain beta and std err via bootstrap
-    bootstrap_betas = np.zeros((bootstrap_samples,d))
-    boostrap_ses = np.zeros((bootstrap_samples,d))
+    bootstrap_betas = np.zeros((bootstrap_samples, d))
+    boostrap_ses = np.zeros((bootstrap_samples, d))
     for b in range(bootstrap_samples):
-        idx = np.random.choice(range(n),n)
-        X_ols = X_unlabeled[idx,:]
+        idx = np.random.choice(range(n), n)
+        X_ols = X_unlabeled[idx, :]
         Y_ols = Yhat_unlabeled_debiased[idx]
-        bootstrap_betas[b,:], bootstrap_ses[b, :] = _ols(X_ols, Y_ols, return_se=True)
+        bootstrap_betas[b, :], bootstrap_ses[b, :] = _ols(
+            X_ols, Y_ols, return_se=True
+        )
     pointest = np.median(bootstrap_betas, axis=0)
     se = np.median(bootstrap_ses, axis=0)
     return _zconfint_generic(pointest, se, alpha, alternative)
+
 
 """
     LOGISTIC REGRESSION
@@ -168,11 +179,11 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     d = X.shape[1]
     pointest = logistic(X, Y)
     mu = expit(X @ pointest)
-    V = np.zeros((d,d))
-    grads = np.zeros((n,d))
+    V = np.zeros((d, d))
+    grads = np.zeros((n, d))
     for i in range(n):
-        V += 1/n * mu[i] * (1-mu[i]) * X[i:i+1,:].T @ X[i:i+1,:]
-        grads[i] += (mu[i] - Y[i])*X[i]
+        V += 1 / n * mu[i] * (1 - mu[i]) * X[i : i + 1, :].T @ X[i : i + 1, :]
+        grads[i] += (mu[i] - Y[i]) * X[i]
     V_inv = np.linalg.inv(V)
     cov_mat = V_inv @ np.cov(grads.T) @ V_inv
     return _zconfint_generic(

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pdb
 
+
 def plot_interval(
     ax,
     lower,
@@ -67,9 +68,9 @@ def make_plots(
         n=num_intervals, replace=False
     )
     if plot_classical:
-        classical_intervals = df[(df.n == n) & (df.method == "Classical")].sample(
-            n=num_intervals, replace=False
-        )
+        classical_intervals = df[
+            (df.n == n) & (df.method == "Classical")
+        ].sample(n=num_intervals, replace=False)
     imputation_interval = df[df.method == "Imputation"]
 
     xlim = [None, None]
@@ -156,9 +157,10 @@ def make_plots(
     ]
     if plot_classical:
         classical_widths = [
-            df[(df.n == _n) & (df.method == "Classical")].width.mean() for _n in ns
+            df[(df.n == _n) & (df.method == "Classical")].width.mean()
+            for _n in ns
         ]
-    
+
     axs[2].plot(
         ns,
         ppi_widths,
@@ -180,21 +182,28 @@ def make_plots(
     if plot_classical:
         classical_width_list = []
     for _n in ns:
-        trials = np.random.choice(num_trials, size=num_scatter, replace=False).astype(int)
+        trials = np.random.choice(
+            num_trials, size=num_scatter, replace=False
+        ).astype(int)
         ppi_width_list += df[
             (df.n == _n) & (df.method == "PPI") & df.trial.isin(trials)
         ].width.to_list()
         if plot_classical:
             classical_width_list += df[
-                (df.n == _n) & (df.method == "Classical") & df.trial.isin(trials)
+                (df.n == _n)
+                & (df.method == "Classical")
+                & df.trial.isin(trials)
             ].width.to_list()
         n_list += [_n] * num_scatter
-        
+
     axs[2].scatter(n_list, ppi_width_list, color=ppi_strokecolor, alpha=0.5)
 
     if plot_classical:
         axs[2].scatter(
-            n_list, classical_width_list, color=classical_strokecolor, alpha=0.5
+            n_list,
+            classical_width_list,
+            color=classical_strokecolor,
+            alpha=0.5,
         )
 
     axs[2].locator_params(axis="y", tight=None, nbins=6)
