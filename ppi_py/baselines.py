@@ -146,12 +146,15 @@ def logistic(X, Y):
 
 def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     n = Y.shape[0]
+    d = X.shape[1]
     pointest = logistic(X, Y)
     mu = expit(X @ pointest)
-    D = np.diag(np.multiply(mu, 1 - mu))
-    V = 1 / n * X.T @ D @ X
+    V = np.zeros((d,d))
+    grads = np.zeros((n,d))
+    for i in range(n):
+        V += 1/n * mu[i] * (1-mu[i]) * X[i:i+1,:].T @ X[i:i+1,:]
+        grads[i] += (mu[i] - Y[i])*X[i]
     V_inv = np.linalg.inv(V)
-    grads = np.diag(mu - Y) @ X
     cov_mat = V_inv @ np.cov(grads.T) @ V_inv
     return _zconfint_generic(
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative

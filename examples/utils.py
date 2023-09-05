@@ -47,6 +47,7 @@ def make_plots(
     true_theta=None,
     true_label=r"$\theta^*$",
     intervals_xlabel="x",
+    plot_classical=True,
     ppi_facecolor="#DAF3DA",
     ppi_strokecolor="#71D26F",
     classical_facecolor="#EEEDED",
@@ -65,9 +66,10 @@ def make_plots(
     ppi_intervals = df[(df.n == n) & (df.method == "PPI")].sample(
         n=num_intervals, replace=False
     )
-    classical_intervals = df[(df.n == n) & (df.method == "Classical")].sample(
-        n=num_intervals, replace=False
-    )
+    if plot_classical:
+        classical_intervals = df[(df.n == n) & (df.method == "Classical")].sample(
+            n=num_intervals, replace=False
+        )
     imputation_interval = df[df.method == "Imputation"]
 
     xlim = [None, None]
@@ -88,7 +90,8 @@ def make_plots(
 
     for i in range(num_intervals):
         ppi_interval = ppi_intervals.iloc[i]
-        classical_interval = classical_intervals.iloc[i]
+        if plot_classical:
+            classical_interval = classical_intervals.iloc[i]
 
         if i == 0:
             plot_interval(
@@ -100,15 +103,16 @@ def make_plots(
                 ppi_strokecolor,
                 label="prediction-powered",
             )
-            plot_interval(
-                axs[1],
-                classical_interval.lower,
-                classical_interval.upper,
-                0.25,
-                classical_facecolor,
-                classical_strokecolor,
-                label="classical",
-            )
+            if plot_classical:
+                plot_interval(
+                    axs[1],
+                    classical_interval.lower,
+                    classical_interval.upper,
+                    0.25,
+                    classical_facecolor,
+                    classical_strokecolor,
+                    label="classical",
+                )
             plot_interval(
                 axs[1],
                 imputation_interval.lower,
@@ -129,14 +133,15 @@ def make_plots(
                 lighten_color(ppi_facecolor, lighten_factor),
                 lighten_color(ppi_strokecolor, lighten_factor),
             )
-            plot_interval(
-                axs[1],
-                classical_interval.lower,
-                classical_interval.upper,
-                0.25 + yshift,
-                lighten_color(classical_facecolor, lighten_factor),
-                lighten_color(classical_strokecolor, lighten_factor),
-            )
+            if plot_classical:
+                plot_interval(
+                    axs[1],
+                    classical_interval.lower,
+                    classical_interval.upper,
+                    0.25 + yshift,
+                    lighten_color(classical_facecolor, lighten_factor),
+                    lighten_color(classical_strokecolor, lighten_factor),
+                )
 
     axs[1].set_xlabel(intervals_xlabel, labelpad=10)
     axs[1].set_yticks([])
@@ -149,9 +154,10 @@ def make_plots(
     ppi_widths = [
         df[(df.n == _n) & (df.method == "PPI")].width.mean() for _n in ns
     ]
-    classical_widths = [
-        df[(df.n == _n) & (df.method == "Classical")].width.mean() for _n in ns
-    ]
+    if plot_classical:
+        classical_widths = [
+            df[(df.n == _n) & (df.method == "Classical")].width.mean() for _n in ns
+        ]
     
     axs[2].plot(
         ns,
@@ -160,32 +166,36 @@ def make_plots(
         color=ppi_strokecolor,
         linewidth=3,
     )
-    axs[2].plot(
-        ns,
-        classical_widths,
-        label="classical",
-        color=classical_strokecolor,
-        linewidth=3,
-    )
+    if plot_classical:
+        axs[2].plot(
+            ns,
+            classical_widths,
+            label="classical",
+            color=classical_strokecolor,
+            linewidth=3,
+        )
 
     n_list = []
     ppi_width_list = []
-    classical_width_list = []
+    if plot_classical:
+        classical_width_list = []
     for _n in ns:
         trials = np.random.choice(num_trials, size=num_scatter, replace=False).astype(int)
         ppi_width_list += df[
             (df.n == _n) & (df.method == "PPI") & df.trial.isin(trials)
         ].width.to_list()
-        classical_width_list += df[
-            (df.n == _n) & (df.method == "Classical") & df.trial.isin(trials)
-        ].width.to_list()
+        if plot_classical:
+            classical_width_list += df[
+                (df.n == _n) & (df.method == "Classical") & df.trial.isin(trials)
+            ].width.to_list()
         n_list += [_n] * num_scatter
         
     axs[2].scatter(n_list, ppi_width_list, color=ppi_strokecolor, alpha=0.5)
 
-    axs[2].scatter(
-        n_list, classical_width_list, color=classical_strokecolor, alpha=0.5
-    )
+    if plot_classical:
+        axs[2].scatter(
+            n_list, classical_width_list, color=classical_strokecolor, alpha=0.5
+        )
 
     axs[2].locator_params(axis="y", tight=None, nbins=6)
     axs[2].set_ylabel("width")
