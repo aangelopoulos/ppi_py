@@ -55,6 +55,7 @@ def make_plots(
     classical_strokecolor="#BFB9B9",
     imputation_facecolor="#FFEACC",
     imputation_strokecolor="#FFCD82",
+    empty_panel=True
 ):
     # Make plot
     num_intervals = 5
@@ -76,10 +77,13 @@ def make_plots(
     xlim = [None, None]
     ylim = [0, 1.15]
 
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
+    if empty_panel:
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(9, 3))
+    else:
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(6, 3))
     sns.set_theme(style="white", font_scale=1, font="DejaVu Sans")
     if true_theta is not None:
-        axs[1].axvline(
+        axs[-2].axvline(
             true_theta,
             ymin=0.0,
             ymax=1,
@@ -96,7 +100,7 @@ def make_plots(
 
         if i == 0:
             plot_interval(
-                axs[1],
+                axs[-2],
                 ppi_interval.lower,
                 ppi_interval.upper,
                 0.7,
@@ -106,7 +110,7 @@ def make_plots(
             )
             if plot_classical:
                 plot_interval(
-                    axs[1],
+                    axs[-2],
                     classical_interval.lower,
                     classical_interval.upper,
                     0.25,
@@ -115,7 +119,7 @@ def make_plots(
                     label="classical",
                 )
             plot_interval(
-                axs[1],
+                axs[-2],
                 imputation_interval.lower,
                 imputation_interval.upper,
                 0.1,
@@ -127,7 +131,7 @@ def make_plots(
             lighten_factor = 0.8 / np.sqrt(num_intervals - i)
             yshift = (num_intervals - i) * 0.07
             plot_interval(
-                axs[1],
+                axs[-2],
                 ppi_interval.lower,
                 ppi_interval.upper,
                 0.7 + yshift,
@@ -136,7 +140,7 @@ def make_plots(
             )
             if plot_classical:
                 plot_interval(
-                    axs[1],
+                    axs[-2],
                     classical_interval.lower,
                     classical_interval.upper,
                     0.25 + yshift,
@@ -144,13 +148,13 @@ def make_plots(
                     lighten_color(classical_strokecolor, lighten_factor),
                 )
 
-    axs[1].set_xlabel(intervals_xlabel, labelpad=10)
-    axs[1].set_yticks([])
-    axs[1].set_yticklabels([])
-    axs[1].set_ylim(ylim)
-    axs[1].set_xlim(xlim)
+    axs[-2].set_xlabel(intervals_xlabel, labelpad=10)
+    axs[-2].set_yticks([])
+    axs[-2].set_yticklabels([])
+    axs[-2].set_ylim(ylim)
+    axs[-2].set_xlim(xlim)
 
-    sns.despine(ax=axs[1], top=True, right=True, left=True)
+    sns.despine(ax=axs[-2], top=True, right=True, left=True)
 
     ppi_widths = [
         df[(df.n == _n) & (df.method == "PPI")].width.mean() for _n in ns
@@ -161,7 +165,7 @@ def make_plots(
             for _n in ns
         ]
 
-    axs[2].plot(
+    axs[-1].plot(
         ns,
         ppi_widths,
         label="prediction-powered",
@@ -169,7 +173,7 @@ def make_plots(
         linewidth=3,
     )
     if plot_classical:
-        axs[2].plot(
+        axs[-1].plot(
             ns,
             classical_widths,
             label="classical",
@@ -196,26 +200,27 @@ def make_plots(
             ].width.to_list()
         n_list += [_n] * num_scatter
 
-    axs[2].scatter(n_list, ppi_width_list, color=ppi_strokecolor, alpha=0.5)
+    axs[-1].scatter(n_list, ppi_width_list, color=ppi_strokecolor, alpha=0.5)
 
     if plot_classical:
-        axs[2].scatter(
+        axs[-1].scatter(
             n_list,
             classical_width_list,
             color=classical_strokecolor,
             alpha=0.5,
         )
 
-    axs[2].locator_params(axis="y", tight=None, nbins=6)
-    axs[2].set_ylabel("width")
-    axs[2].set_xlabel("n", labelpad=10)
-    sns.despine(ax=axs[2], top=True, right=True)
+    axs[-1].locator_params(axis="y", tight=None, nbins=6)
+    axs[-1].set_ylabel("width")
+    axs[-1].set_xlabel("n", labelpad=10)
+    sns.despine(ax=axs[-1], top=True, right=True)
 
-    sns.despine(ax=axs[0], top=True, right=True, left=True, bottom=True)
-    axs[0].set_xticks([])
-    axs[0].set_yticks([])
-    axs[0].set_xticklabels([])
-    axs[0].set_yticklabels([])
+    if empty_panel:
+        sns.despine(ax=axs[0], top=True, right=True, left=True, bottom=True)
+        axs[0].set_xticks([])
+        axs[0].set_yticks([])
+        axs[0].set_xticklabels([])
+        axs[0].set_yticklabels([])
 
     plt.tight_layout()
     plt.savefig(plot_savename)
