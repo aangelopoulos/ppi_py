@@ -139,9 +139,11 @@ def postprediction_ols_ci(
 ):
     N, d = X_unlabeled.shape
     # fit map to debias predictions
-    regression = IsotonicRegression(out_of_bounds='clip').fit(Yhat, Y)#LinearRegression().fit(Yhat[:,None], Y)
+    regression = IsotonicRegression(out_of_bounds="clip").fit(
+        Yhat, Y
+    )  # LinearRegression().fit(Yhat[:,None], Y)
     # debias predictions on unlabeled data
-    Yhat_unlabeled_debiased = regression.predict(Yhat_unlabeled[:,None])
+    Yhat_unlabeled_debiased = regression.predict(Yhat_unlabeled[:, None])
     # obtain beta and std err via bootstrap
     bootstrap_betas = np.zeros((bootstrap_samples, d))
     bootstrap_ses = np.zeros((bootstrap_samples, d))

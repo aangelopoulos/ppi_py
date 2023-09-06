@@ -125,4 +125,3 @@ def test_postprediction_ols_ci():
     print((includeds / num_trials))
     failed = np.any((includeds / num_trials) < (1 - alphas - epsilon))
     assert not failed
-
