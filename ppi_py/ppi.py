@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm, binom
 from scipy.special import expit
 from scipy.optimize import brentq
-from statsmodels.regression.linear_model import OLS
+from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import (
@@ -337,9 +337,45 @@ def ppi_logistic_ci(
         grid_edge_accepted = accept[0] or accept[-1]
     return confset.min(axis=0), confset.max(axis=0)
 
+"""
+    ORDINARY LEAST SQUARES UNDER COVARIATE SHIFT
 
 """
-    Discrete distribution estimatuion under distribution shift ʕ·ᴥ·ʔ
+
+
+def _wls(X, Y, w, return_se=False):
+    regression = WLS(Y, exog=X, weights=w).fit()
+    theta = regression.params
+    if return_se:
+        return theta, regression.HC0_se
+    else:
+        return theta
+
+
+def ppi_ols_covshift_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w):
+    imputed_theta = _wls(X_unlabeled, Yhat_unlabeled)
+    rectifier = _wls(X, Y - Yhat, w)
+    return imputed_theta + rectifier
+
+
+def ppi_ols_covshift_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, alpha=0.1):
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    imputed_theta, imputed_se = _ols(
+        X_unlabeled, Yhat_unlabeled, return_se=True
+    )
+    rectifier, rectifier_se = _wls(X, Y - Yhat, w, return_se=True)
+    return _rectified_ci(
+        imputed_theta,
+        imputed_se,
+        rectifier,
+        rectifier_se,
+        alpha,
+        alternative="two-sided",
+    )
+
+"""
+    DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT ʕ·ᴥ·ʔ
 
 """
 

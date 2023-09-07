@@ -6,7 +6,7 @@ from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.isotonic import IsotonicRegression
 from .utils import dataframe_decorator
-from .ppi import _ols
+from .ppi import _ols, _wls
 import pdb
 
 """
@@ -125,6 +125,12 @@ def classical_quantile_ci(Y, q, alpha=0.1):
 def classical_ols_ci(X, Y, alpha=0.1, alternative="two-sided"):
     n = Y.shape[0]
     pointest, se = _ols(X, Y, return_se=True)
+    return _zconfint_generic(pointest, se, alpha, alternative)
+
+
+def classical_ols_covshift_ci(X, Y, w, alpha=0.1, alternative="two-sided"):
+    n = Y.shape[0]
+    pointest, se = _wls(X, Y, w, return_se=True)
     return _zconfint_generic(pointest, se, alpha, alternative)
 
 
