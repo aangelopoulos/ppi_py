@@ -19,3 +19,6 @@ Coming soon!
 
 # Documentation
 Coming soon!
+
+# Contributing
+Coming soon!
