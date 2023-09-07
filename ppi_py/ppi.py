@@ -337,6 +337,7 @@ def ppi_logistic_ci(
         grid_edge_accepted = accept[0] or accept[-1]
     return confset.min(axis=0), confset.max(axis=0)
 
+
 """
     ORDINARY LEAST SQUARES UNDER COVARIATE SHIFT
 
@@ -373,6 +374,7 @@ def ppi_ols_covshift_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, alpha=0.1):
         alpha,
         alternative="two-sided",
     )
+
 
 """
     DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT ʕ·ᴥ·ʔ

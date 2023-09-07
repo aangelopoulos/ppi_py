@@ -55,7 +55,7 @@ def make_plots(
     classical_strokecolor="#BFB9B9",
     imputation_facecolor="#FFEACC",
     imputation_strokecolor="#FFCD82",
-    empty_panel=True
+    empty_panel=True,
 ):
     # Make plot
     num_intervals = 5
