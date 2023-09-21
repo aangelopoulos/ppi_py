@@ -233,6 +233,31 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
     )
 
 
+def eff_ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided'):
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+
+    ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
+
+    Hessian = np.zeros((d,d))
+    grads_til = np.zeros(X_unlabeled.shape)
+    for i in range(N):
+        Hessian += 1/N * np.outer(X_unlabeled[i], X_unlabeled[i])
+        grads_til[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
+
+    inv_Hessian = np.linalg.inv(Hessian)
+    var_unlabeled = np.cov(grads_til.T)
+
+    pred_error = Yhat - Y
+    grad_diff = np.diag(pred_error) @ X
+    var = np.cov(grad_diff.T)
+
+    Sigma_hat = inv_Hessian @ (n/N * var_unlabeled + var) @ inv_Hessian
+
+    return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
+
+
 """
     LOGISTIC REGRESSION
 
@@ -337,6 +362,50 @@ def ppi_logistic_ci(
         grid_edge_accepted = accept[0] or accept[-1]
     return confset.min(axis=0), confset.max(axis=0)
 
+
+def eff_ppi_logistic_ci(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    alpha=0.1,
+    step_size=1e-3,  # Optimizer step size
+    grad_tol=5e-16,  # Optimizer grad tol
+    alternative='two-sided'
+):
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+
+    ppi_pointest = ppi_logistic_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        step_size=step_size,
+        grad_tol=grad_tol,
+    )
+
+    mu_til = expit(X_unlabeled@ppi_pointest)
+
+    Hessian = np.zeros((d,d))
+    grads_til = np.zeros(X_unlabeled.shape)
+    for i in range(N):
+        Hessian += 1/N * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
+        grads_til[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
+
+    inv_Hessian = np.linalg.inv(Hessian)
+    var_unlabeled = np.cov(grads_til.T)
+
+    pred_error = Yhat - Y
+    grad_diff = np.diag(pred_error) @ X
+    var = np.cov(grad_diff.T)
+
+    Sigma_hat = inv_Hessian @ (n/N * var_unlabeled + var) @ inv_Hessian
+
+    return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
 
 """
     ORDINARY LEAST SQUARES UNDER COVARIATE SHIFT
