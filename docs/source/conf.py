@@ -16,9 +16,8 @@ release = '0.1'
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon', 'sphinx.ext.mathjax', 'sphinx.ext.viewcode']
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
-
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -38,4 +37,3 @@ html_theme_options = {
     'sidebar_width': '25%',
     'description': 'A python package for powerful statistical inference using machine learning',
 }
-
