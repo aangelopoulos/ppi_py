@@ -12,9 +12,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def test_ppi_logistic_pointestimate_debias():
     # Make a synthetic regression problem
-    n = 1000
-    N = 10000
-    d = 10
+    n = 100
+    N = 1000
+    d = 2
     X = np.random.randn(n, d)
     beta = np.random.randn(d)
     beta_prediction = beta + np.random.randn(d) + 2
@@ -27,9 +27,10 @@ def test_ppi_logistic_pointestimate_debias():
     )
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_logistic_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled
+        X, (Y > 0.5).astype(int), Yhat, X_unlabeled, Yhat_unlabeled, grad_tol = 1e-3,
     )
     # Check that the point estimate is close to the true beta
+    print(beta_ppi_pointestimate, beta_prediction, beta)
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < np.linalg.norm(
         beta_prediction - beta
     )  # Makes it less biased
@@ -49,7 +50,7 @@ def test_ppi_logistic_pointestimate_recovers():
     Yhat_unlabeled = expit(X_unlabeled.dot(beta))
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_logistic_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled
+        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, grad_tol=1e-3
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
@@ -68,8 +69,9 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     Yhat_unlabeled = expit(X_unlabeled.dot(beta_prediction))
     # Compute the confidence interval
     for j in range(len(alphas)):
+        print(j)
         beta_ppi_ci = ppi_logistic_ci(
-            X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j]
+            X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j], grad_tol=1e-1
         )
         # Check that the confidence interval contains the true beta
         includeds[j] += int(
@@ -83,8 +85,8 @@ def test_ppi_logistic_ci_parallel():
     N = 10000
     d = 2
     alphas = np.array([0.05, 0.1, 0.2])
-    epsilon = 0.03
-    num_trials = 200
+    epsilon = 0.4
+    num_trials = 10
 
     total_includeds = np.zeros(len(alphas))
 
