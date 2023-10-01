@@ -1,4 +1,4 @@
-![ppi_py logo](./assets/ppi.svg?)
+![ppi_py logo](./assets/ppi.svg?maxAge=2592000)
 
 Prediction-powered inference (PPI) is a framework for statistically rigorous scientific discovery using machine learning.
 Given a small amount of data with gold-standard labels and a large amount of unlabeled data, prediction-powered inference allows for the estimation of population parameters, such as the mean outcome, median outcome, linear and logistic regression coefficients.
