@@ -8,7 +8,8 @@ Welcome to ppi_py's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   ppi
+   baselines
 
 Indices and tables
 ==================
