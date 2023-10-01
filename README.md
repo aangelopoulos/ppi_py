@@ -50,7 +50,7 @@ ppi_ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alpha)
 print(f"theta={Y_total.mean():.3f}, CPP={ppi_ci}")
 ```
 
-The expected results look as below$^*$: 
+The expected results look as below $^*$: 
 ```
 theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
 ```
