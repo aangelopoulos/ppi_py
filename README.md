@@ -107,4 +107,4 @@ The contents of this repository will be pushed to PyPI whenever there are substa
 - The pull request should be of generally high quality, up to the review of the repository maintainers. 
 The repository maintainers will approve pull requests at their discretion. Before working on one, it may be helpful to post a question on the issues page to verify if the contribution would be a good candidate for merging into the main branch.
 
-Accepted pull requests will be run through an automated (Black)[https://black.readthedocs.io/en/stable/] formatter, so contributors may want to run Black locally first.
+Accepted pull requests will be run through an automated [Black](https://black.readthedocs.io/en/stable/) formatter, so contributors may want to run Black locally first.
