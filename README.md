@@ -29,10 +29,10 @@ To test your installation, you can try running the prediction-powered mean estim
 The gold-standard labels and model predictions from the dataset will be downloaded into a folder called `./data/`.
 The labels, $Y$, are binary indicators of whether or not the galaxy is a spiral galaxy.
 The model predictions, $\hat{Y}$, are the model's estimated probability of whether the galaxy image has spiral arms.
-The inference target is $\theta = \mathbb{E}[Y]$, the fraction of spiral galaxies.
-You will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta$ with probability $1-\alpha=90\%$, i.e.,
+The inference target is $\theta^* = \mathbb{E}[Y]$, the fraction of spiral galaxies.
+You will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta^*$ with probability $1-\alpha=90\%$, i.e.,
 ```math
-    \mathbb{P}\left( \theta \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 90\%.
+    \mathbb{P}\left( \theta^* \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 90\%.
 ```
 
 The code for this is below. It can be copy-pasted directly into the Python REPL.
