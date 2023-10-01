@@ -1,4 +1,6 @@
-![ppi_py logo](./assets/ppi.svg?maxAge=2592000)
+<p align="center">
+    <img src="./assets/ppi.svg?maxAge=2592000"/>
+</p>
 <p align="center">
     <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2301.09633" alt="arXiv"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
     <a style="text-decoration:none !important;" href="./" alt="package management"> <img src="https://img.shields.io/badge/pip-package-blue" /></a>
