@@ -74,6 +74,8 @@ The package somes with a suite of examples on real data:
 
 # Usage
 Coming soon!
+
+# Repository structure
  
 # Documentation
 Coming soon!
@@ -88,3 +90,6 @@ The contents of this repository will be pushed to PyPI whenever there are substa
 - If the pull request solves a bug, there should be a reproducible bug (within a specific environment) that is solved. Bug reports can be made on the issues page.
 - The contribution should be [well documented](https://cookbook.openai.com/what_makes_documentation_good).
 - The pull request should be of generally high quality, up to the review of the repository maintainers. 
+The repository maintainers will approve pull requests at their discretion. Before working on one, it may be helpful to post a question on the issues page to verify if the contribution would be a good candidate for merging into the main branch.
+
+Accepted pull requests will be run through an automated (Black)[https://black.readthedocs.io/en/stable/] formatter, so contributors may want to run Black locally first.
