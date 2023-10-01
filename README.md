@@ -1,4 +1,10 @@
 ![ppi_py logo](./assets/ppi.svg?maxAge=2592000)
+<p align="center">
+    <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2301.09633" alt="arXiv"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
+    <a style="text-decoration:none !important;" href="./" alt="package management"> <img src="https://img.shields.io/badge/pip-package-blue" /></a>
+    <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License"><img src="https://img.shields.io/badge/license-MIT-750014" /></a>
+    <a style="text-decoration:none !important;" href="http://hits.dwyl.com/aangelopoulos/ppi_py" alt="hits"><img src="https://hits.dwyl.com/aangelopoulos/ppi_py.svg?style=flat-square" /></a>
+</p>
 
 Prediction-powered inference (PPI) is a framework for statistically rigorous scientific discovery using machine learning.
 Given a small amount of data with gold-standard labels and a large amount of unlabeled data, prediction-powered inference allows for the estimation of population parameters, such as the mean outcome, median outcome, linear and logistic regression coefficients.
