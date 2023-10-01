@@ -27,34 +27,37 @@ We will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which
     \mathbb{P}\left( \theta \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 90\%.
 ```
 
-The code for this is below.
+The code for this is below. It can be copy-pasted directly into the Python REPL.
 ```python
 # Imports
+import numpy as np
 from ppi_py import ppi_mean_ci
 from ppi_py.datasets import load_dataset
+np.random.seed(0) # For reproducibility's sake
 # Download and load dataset
 data = load_dataset('./data/', "galaxies")
 Y_total = data["Y"]; Yhat_total = data["Yhat"]
 # Set up the inference problem
 alpha = 0.1 # Error rate
 n = 1000 # Number of labeled data points
-rand_idx = np.random.permutation(Y_totals.shape[0])
+rand_idx = np.random.permutation(Y_total.shape[0])
 Yhat = Yhat_total[rand_idx[:n]]
 Y = Y_total[rand_idx[:n]]
 Yhat_unlabeled = Yhat_total[n:]
 # Produce the prediction-powered confidence interval
 ppi_ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alpha)
 # Print the results
-print(r'$\theta=$' + f"{Y_total.mean():.3f" + r', $\mathcal{C}_{\alpha}^{\mathrm{PP}} =$' + f"{ppi_ci}")
+print(f"theta={Y_total.mean():.3f}, CPP={ppi_ci}")
 ```
 
-The expected results look approximately as below. Your results will differ slightly because of the random seed.
+The expected results look as below$^*$: 
 ```
-
+theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
 ```
+($^*$ these results were produced with ```numpy=1.26.0```, and may differ slightly due to randomness in other environments.)
 
-# Usage
-Coming soon!
+If you have reached this stage, congratulations! You have constructed a prediction-powered confidence interval.
+See [the documentation]() for more usages of prediction powered inference.
 
 # Examples
 
@@ -68,6 +71,9 @@ The package somes with a suite of examples on real data:
 - Plankton Counting with Computer Vision (label shift) ([```plankton.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/plankton.ipynb))
 - Ballot Counting with Computer Vision ([```ballots.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/ballots.ipynb))
 - Income Analysis with Boosting Trees ([```census_income.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/census_income.ipynb))
+
+# Usage
+Coming soon!
  
 # Documentation
 Coming soon!
