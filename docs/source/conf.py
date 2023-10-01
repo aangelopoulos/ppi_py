@@ -28,12 +28,14 @@ templates_path = ["_templates"]
 exclude_patterns = []
 autodoc_mock_imports = ["numpy", "scipy", "statsmodels", "sklearn", "pandas"]
 
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "alabaster"
 html_static_path = ["_static"]
+html_css_files = [
+    'custom.css',
+]
 html_theme_options = {
     "logo": "ppi.svg",
     "github_user": "aangelopoulos",

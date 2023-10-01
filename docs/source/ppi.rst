@@ -1,8 +1,8 @@
 
-ppi module
-==========
+Functions for PPI 
+==========================================
 
-Module for functions related to ppi.
+Documentation for functions implementing some form of prediction-powered inference can be found here.
 
 .. autofunction:: ppi_py.ppi_mean_pointestimate
 .. autofunction:: ppi_py.ppi_mean_ci
