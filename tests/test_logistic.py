@@ -27,7 +27,12 @@ def test_ppi_logistic_pointestimate_debias():
     )
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_logistic_pointestimate(
-        X, (Y > 0.5).astype(int), Yhat, X_unlabeled, Yhat_unlabeled, grad_tol = 1e-3,
+        X,
+        (Y > 0.5).astype(int),
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        grad_tol=1e-3,
     )
     # Check that the point estimate is close to the true beta
     print(beta_ppi_pointestimate, beta_prediction, beta)
@@ -71,7 +76,13 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     for j in range(len(alphas)):
         print(j)
         beta_ppi_ci = ppi_logistic_ci(
-            X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alphas[j], grad_tol=1e-1
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            alpha=alphas[j],
+            grad_tol=1e-1,
         )
         # Check that the confidence interval contains the true beta
         includeds[j] += int(

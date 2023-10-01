@@ -123,5 +123,5 @@ def test_postprediction_ols_ci():
                 (beta_ci[0][0] <= beta[0]) & (beta[0] <= beta_ci[1][0])
             )
     print((includeds / num_trials))
-    failed = False # This confidence interval doesn't cover, so the test succeeds if it can construct intervals...
+    failed = False  # This confidence interval doesn't cover, so the test succeeds if it can construct intervals...
     assert not failed
