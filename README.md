@@ -11,7 +11,7 @@
 Prediction-powered inference (PPI) is a framework for statistically rigorous scientific discovery using machine learning.
 Given a small amount of data with gold-standard labels and a large amount of unlabeled data, prediction-powered inference allows for the estimation of population parameters, such as the mean outcome, median outcome, linear and logistic regression coefficients.
 Prediction-powered inference can be used both to produce better point estimates of these quantities as well as tighter confidence intervals and more powerful p-values.
-The methods work both in the i.i.d. setting and for certain classees of distribution shifts.
+The methods work both in the i.i.d. setting and for certain classes of distribution shifts.
 
 This package is actively maintained, and contributions from the community are welcome.
 
@@ -65,7 +65,7 @@ theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
 ($^*$ these results were produced with ```numpy=1.26.0```, and may differ slightly due to randomness in other environments.)
 
 If you have reached this stage, congratulations! You have constructed a prediction-powered confidence interval.
-See [the documentation]() for more usages of prediction powered inference.
+See [the documentation]() for more usages of prediction-powered inference.
 
 # Examples
 
@@ -87,7 +87,7 @@ There is a common template that all PPI confidence intervals follow.
 ppi_[ESTIMAND]_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1)
 ```
 
-You can replace ```[ESTIMAND]``` with the estimand of your choice. For certain estimands, not all the arguments are required, and in this case, they are ommitted. For example, in the case of mean estimation, the function signature is:
+You can replace ```[ESTIMAND]``` with the estimand of your choice. For certain estimands, not all the arguments are required, and in this case, they are omitted. For example, in the case of mean estimation, the function signature is:
 ```python
 ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1)
 ```
@@ -114,7 +114,7 @@ The folder ```./tests``` contains unit tests for each function implemented in th
 The remainder of the files/folders are boilerplate and not relevant to most users.
 
 # Contributing
-Thank you so much for reaching out! It's the collective efforts of the open-source community that make it such a vibrant and enriching space for everyone. Every contribution you make radiates positive impact, and we deeply value and appreciate it. Keep the spirit alive!
+Thank you so much for considering making a contribution to ```ppi_py```; we deeply value and appreciate it.
 
 The contents of this repository will be pushed to PyPI whenever there are substantial revisions. If there are methods or examples within the PPI framework you'd like to see implemented, feel free to suggest them on the [issues page](https://github.com/aangelopoulos/ppi_py/issues). Community contributions are welcome and encouraged as pull requests directly onto the main branch. The main criteria for accepting such pull requests is:
 - The contribution should align with the repository's scope.

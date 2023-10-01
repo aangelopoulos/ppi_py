@@ -1,6 +1,6 @@
 
-Functions for Baseline Inference
-================================
+API Reference for Baseline Inference
+====================================
 
 Documentation for functions implementing baseline inference strategies can be found here. These are functions that either use only gold-standard data or use gold-standard + unlabeled data in a way that is not consistent with or part of the PPI framework.
 

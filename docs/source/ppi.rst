@@ -1,5 +1,5 @@
 
-Functions for PPI 
+API Reference for PPI 
 ==========================================
 
 Documentation for functions implementing some form of prediction-powered inference can be found here.
