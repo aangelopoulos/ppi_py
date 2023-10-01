@@ -4,6 +4,7 @@
 <p align="center">
     <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2301.09633" alt="arXiv"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
     <a style="text-decoration:none !important;" href="./" alt="package management"> <img src="https://img.shields.io/badge/pip-package-blue" /></a>
+    <a style="text-decoration:none !important;" href="https://ppi-py.readthedocs.io/en/latest/" alt="documentation"> <img src="https://img.shields.io/badge/API-docs-34B167" /></a>
     <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License"><img src="https://img.shields.io/badge/license-MIT-750014" /></a>
     <a style="text-decoration:none !important;" href="http://hits.dwyl.com/aangelopoulos/ppi_py" alt="hits"><img src="https://hits.dwyl.com/aangelopoulos/ppi_py.svg?style=flat-square" /></a>
 </p>
@@ -65,7 +66,7 @@ theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
 ($^*$ these results were produced with ```numpy=1.26.0```, and may differ slightly due to randomness in other environments.)
 
 If you have reached this stage, congratulations! You have constructed a prediction-powered confidence interval.
-See [the documentation]() for more usages of prediction-powered inference.
+See [the documentation](https://ppi-py.readthedocs.io/en/latest/) for more usages of prediction-powered inference.
 
 # Examples
 
@@ -94,7 +95,7 @@ ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1)
 
 All the prediction-powered point estimates and confidence intervals implemented so far can be imported by running ```from ppi_py import ppi_[ESTIMAND]_pointestimate, ppi_[ESTIMAND]_ci```. For the case of the mean, one can also import the p-value as ```from ppi import ppi_mean_pval```.
 
-Full documentation is available on [readthedocs]().
+Full documentation is available [here](https://ppi-py.readthedocs.io/en/latest/).
 
 # Repository structure
 The repository is organized into three main folders:
