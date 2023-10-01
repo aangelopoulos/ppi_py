@@ -15,15 +15,17 @@ import pdb
 
 
 def _rectified_mean(rectifier, imputed_mean):
-    """
-    Computes a rectified mean.
+    """Computes a rectified mean.
 
-    Parameters
-    ----------
-    rectifier : float or ndarray
-        The rectifier value.
-    imputed_mean : float or ndarray
-        The imputed mean.
+    The rectified mean is the sum of the rectifier and the imputed mean.
+
+    Args:
+        rectifier (float or ndarray): The rectifier value.
+        imputed_mean (float or ndarray): The imputed mean.
+
+    Returns:
+        float or ndarray: The rectified mean.
+
     """
     return imputed_mean + rectifier
 
@@ -36,21 +38,18 @@ def _rectified_ci(
     alpha,
     alternative="two-sided",
 ):
-    """
-    Computes a rectified confidence interval.
+    """Computes a rectified confidence interval.
 
-    Parameters
-    ----------
-    rectifier : float or ndarray
-        The rectifier value.
-    rectifier_std : float or ndarray
-        The rectifier standard deviation.
-    imputed_mean : float or ndarray
-        The imputed mean.
-    imputed_std : float or ndarray
-        The imputed standard deviation.
-    alpha : float
-        The confidence level.
+    Args:
+        rectifier (float or ndarray): The rectifier value.
+        rectifier_std (float or ndarray): The rectifier standard deviation.
+        imputed_mean (float or ndarray): The imputed mean.
+        imputed_std (float or ndarray): The imputed standard deviation.
+        alpha (float): The error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        alternative (str): The alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        tuple: The lower and upper bounds of the confidence interval.
     """
     rectified_point_estimate = imputed_mean + rectifier
     rectified_std = np.sqrt(imputed_std**2 + rectifier_std**2)
@@ -67,19 +66,18 @@ def _rectified_p_value(
     null=0,
     alternative="two-sided",
 ):
-    """
-    Computes a rectified p-value.
+    """Computes a rectified p-value.
 
-    Parameters
-    ----------
-    rectifier : float or ndarray
-        The rectifier value.
-    rectifier_std : float or ndarray
-        The rectifier standard deviation.
-    imputed_mean : float or ndarray
-        The imputed mean.
-    imputed_std : float or ndarray
-        The imputed standard deviation.
+    Args:
+        rectifier (float or ndarray): The rectifier value.
+        rectifier_std (float or ndarray): The rectifier standard deviation.
+        imputed_mean (float or ndarray): The imputed mean.
+        imputed_std (float or ndarray): The imputed standard deviation.
+        null (float): The value of the null hypothesis to be tested.
+        alternative (str): The alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        float or ndarray: The p-value.
     """
     rectified_point_estimate = imputed_mean + rectifier
     rectified_std = np.maximum(
@@ -97,10 +95,32 @@ def _rectified_p_value(
 
 
 def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled):
+    """Computes the prediction-powered point estimate of the mean.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+
+    Returns:
+        float or ndarray: The prediction-powered point-estimate of the mean.
+    """
     return _rectified_mean((Y - Yhat).mean(), Yhat_unlabeled.mean())
 
 
 def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
+    """Computes the prediction-powered confidence interval for the mean.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        alpha (float): The error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        alternative (str): The alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for the mean.
+    """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     return _rectified_ci(
@@ -114,6 +134,18 @@ def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
 
 
 def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
+    """Computes the prediction-powered p-value for the mean.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        null (float): The value of the null hypothesis to be tested.
+        alternative (str): The alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        float or ndarray: The prediction-powered p-value for the mean.
+    """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     return _rectified_p_value(
@@ -133,11 +165,30 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
 
 
 def _compute_cdf(Y, grid):
+    """Computes the empirical CDF of the data.
+
+    Args:
+        Y (ndarray): The data.
+        grid (ndarray): The grid of values to compute the CDF at.
+
+    Returns:
+        tuple: The empirical CDF and its standard deviation at the specified grid points.
+    """
     indicators = (Y[:, None] <= grid[None, :]).astype(float)
     return indicators.mean(axis=0), indicators.std(axis=0)
 
 
 def _compute_cdf_diff(Y, Yhat, grid):
+    """Computes the difference between the empirical CDFs of the data and the imputations.
+
+    Args:
+        Y (ndarray): The data.
+        Yhat (ndarray): The imputations.
+        grid (ndarray): The grid of values to compute the CDF at.
+
+    Returns:
+        tuple: The difference between the empirical CDFs of the data and the imputations and its standard deviation at the specified grid points.
+    """
     indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
     indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
     return (indicators_Y - indicators_Yhat).mean(axis=0), (
@@ -146,12 +197,35 @@ def _compute_cdf_diff(Y, Yhat, grid):
 
 
 def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid):
+    """Computes the rectified CDF of the data.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        grid (ndarray): The grid of values to compute the CDF at.
+
+    Returns:
+        ndarray: The rectified CDF of the data at the specified grid points.
+    """
     cdf_Yhat_unlabeled, _ = _compute_cdf(Yhat_unlabeled, grid)
     cdf_rectifier, _ = _compute_cdf_diff(Y, Yhat, grid)
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
 def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
+    """Computes the prediction-powered point estimate of the quantile.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        q (float): The quantile to estimate.
+        exact_grid (bool): Whether to use the exact grid of values or a linearly spaced grid of 5000 values.
+
+    Returns:
+        float: The prediction-powered point estimate of the quantile.
+    """
     assert len(Y.shape) == 1
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
     if exact_grid:
@@ -171,6 +245,19 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
 
 
 def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False):
+    """Computes the prediction-powered confidence interval for the quantile.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        q (float): The quantile to estimate. Must be in the range (0, 1).
+        alpha (float): The error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        exact_grid (bool): Whether to use the exact grid of values or a linearly spaced grid of 5000 values.
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for the quantile.
+    """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
@@ -202,6 +289,17 @@ def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False):
 
 
 def _ols(X, Y, return_se=False):
+    """Computes the ordinary least squares coefficients.
+
+    Args:
+        X (ndarray): The covariates.
+        Y (ndarray): The labels.
+        return_se (bool): Whether to return the standard errors of the coefficients.
+
+    Returns:
+        theta (ndarray): The ordinary least squares estimate of the coefficients.
+        se (ndarray): If return_se==True, return the standard errors of the coefficients.
+    """
     regression = OLS(Y, exog=X).fit()
     theta = regression.params
     if return_se:
@@ -211,12 +309,38 @@ def _ols(X, Y, return_se=False):
 
 
 def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
+    """Computes the prediction-powered point estimate of the OLS coefficients.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+
+    Returns:
+        theta_pp (ndarray): The prediction-powered point estimate of the OLS coefficients.
+    """
     imputed_theta = _ols(X_unlabeled, Yhat_unlabeled)
     rectifier = _ols(X, Y - Yhat)
-    return imputed_theta + rectifier
+    theta_pp = imputed_theta + rectifier
+    return theta_pp
 
 
 def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
+    """Computes the prediction-powered confidence interval for the OLS coefficients.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        alpha (float): The error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
+    """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     imputed_theta, imputed_se = _ols(
@@ -241,6 +365,18 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
 
 # Todo: Numba accel
 def ppi_logistic_pointestimate(
+    """Computes the prediction-powered point estimate of the logistic regression coefficients.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+
+    Returns:
+        theta_pp (ndarray): The prediction-powered point estimate of the logistic regression coefficients.
+    """
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1e-3, grad_tol=5e-16
 ):
     n = Y.shape[0]
@@ -282,6 +418,28 @@ def ppi_logistic_ci(
     step_size=1e-3,  # Optimizer step size
     grad_tol=5e-16,  # Optimizer grad tol
 ):
+    """Computes the prediction-powered confidence interval for the logistic regression coefficients.
+
+    This function uses a method of successive refinement, searching over a grid of possible coeffiicents. The grid is centered at the prediction-powered point estimate. The grid is refined until the endpoints of the confidence interval are within the grid radius of the maximum likelihood estimate.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        alpha (float): The error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        grid_size (int): The number of grid points to initially use in the grid search.
+        grid_limit (float): The maximum absolute number of grid points.
+        max_refinements (int): The maximum number of refinements to use in the grid search.
+        grid_radius (float): The initial radius of the grid search.
+        grid_relative (bool): Whether to use a relative grid search --- i.e., whether the radius is in units scaled according to the point estimate.
+        step_size (float): The step size to use in the optimizer.
+        grad_tol (float): The gradient tolerance to use in the optimizer.
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+    """
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
@@ -345,6 +503,18 @@ def ppi_logistic_ci(
 
 
 def _wls(X, Y, w, return_se=False):
+    """Computes the weighted least squares estimate of the coefficients.
+
+    Args:
+        X (ndarray): The covariates.
+        Y (ndarray): The labels.
+        w (ndarray): The weights.
+        return_se (bool): Whether to return the standard errors.
+
+    Returns:
+        theta (ndarray): The weighted least squares estimate of the coefficients.
+        se (ndarray): If return_se==True, returns the standard errors of the coefficients.
+    """
     regression = WLS(Y, exog=X, weights=w).fit()
     theta = regression.params
     if return_se:
@@ -354,12 +524,39 @@ def _wls(X, Y, w, return_se=False):
 
 
 def ppi_ols_covshift_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w):
+    """Computes the prediction-powered point estimate for the ordinary least squares coefficients under covariate shift.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+
+    Returns:
+        theta_pp (ndarray): The prediction-powered point estimate for the ordinary least squares coefficients under covariate shift.
+    """
     imputed_theta = _wls(X_unlabeled, Yhat_unlabeled)
     rectifier = _wls(X, Y - Yhat, w)
-    return imputed_theta + rectifier
+    theta_pp = imputed_theta + rectifier
+    return theta_pp
 
 
 def ppi_ols_covshift_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, alpha=0.1):
+    """Computes the prediction-powered confidence interval for the ordinary least squares coefficients under covariate shift.
+
+    Args:
+        X (ndarray): The covariates corresponding to the gold-standard labels.
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): The covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        w (ndarray): The weights.
+        alpha (float): The significance level.
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for the ordinary least squares coefficients under covariate shift.
+    """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     imputed_theta, imputed_se = _ols(
@@ -385,6 +582,23 @@ def ppi_ols_covshift_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, alpha=0.1):
 def ppi_distribution_label_shift_ci(
     Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, return_counts=True
 ):
+    """Computes the prediction-powered confidence interval for $\nu^T f$ for a discrete distribution $f$, under label shift.
+
+    Args:
+        Y (ndarray): The gold-standard labels.
+        Yhat (ndarray): The imputations corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): The imputations corresponding to the unlabeled data.
+        K (int): The number of classes.
+        nu (ndarray): The vector $\nu$. Coordinates must be bounded within [0, 1].
+        alpha (float): The final error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        delta (float): The error level of the intermediate confidence interval for the mean. Must be in (0, 1). If return_counts == False, then delta is set equal to alpha and ignored.
+        return_counts (bool): Whether to return the number of samples in each class as opposed to the mean.
+
+    Returns:
+        tuple: The lower and upper bounds of the prediction-powered confidence interval for $\nu^T f$ for a discrete distribution $f$, under label shift.
+    """
+    if not return_counts:
+        delta = alpha
     # Construct the confusion matrix
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
