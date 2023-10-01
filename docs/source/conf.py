@@ -35,7 +35,7 @@ autodoc_mock_imports = ["numpy", "scipy", "statsmodels", "sklearn", "pandas"]
 html_theme = "alabaster"
 html_static_path = ["_static"]
 html_css_files = [
-    'custom.css',
+    "custom.css",
 ]
 html_theme_options = {
     "logo": "ppi.svg",
