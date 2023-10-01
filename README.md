@@ -88,7 +88,7 @@ Finally, the file ```./ppi_py/datasets/datasets.py``` handles the loading of the
 
 The folder ```./examples``` contains notebooks for implementing prediction-powered inference on several datasets and estimands. These are listed [above](https://github.com/aangelopoulos/ppi_py/tree/main#examples). There is also an additional subfolder, ```./examples/baselines```, which contains comparisons to certain baseline algorithms, as in the appendix of the original PPI paper.
 
-The folder ```./tests``` contains unit tests for each function implemented in the ```ppi_py``` package. The tests are organized by estimand, and can be run by executing ```pytest``` in the root directory. Note that in order to be recognized by ```pytest```, all tests must be preceded by ```test_```.
+The folder ```./tests``` contains unit tests for each function implemented in the ```ppi_py``` package. The tests are organized by estimand, and can be run by executing ```pytest``` in the root directory. Some of the tests are stochastic, and therefore, have some failure probability, even if the functions are all implemented correctly. If a test fails, it may be worth running it again. Debugging the tests can be done by adding the ```-s``` flag and using print statements or ```pdb```. Note that in order to be recognized by ```pytest```, all tests must be preceded by ```test_```.
 
 The remainder of the files/folders are boilerplate and not relevant to most users.
  
