@@ -22,7 +22,7 @@ The gold-standard labels and model predictions from the dataset will be download
 The labels, $Y$, are binary indicators of whether or not the galaxy is a spiral galaxy.
 The model predictions, $\hat{Y}$, are the model's estimated probability of whether the galaxy image has spiral arms.
 The inference target is $\theta = \mathbb{E}[Y]$, the fraction of spiral galaxies.
-We will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta$ with probability $1-\alpha=90\%$, i.e.,
+You will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta$ with probability $1-\alpha=90\%$, i.e.,
 ```math
     \mathbb{P}\left( \theta \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 90\%.
 ```
@@ -76,6 +76,21 @@ The package somes with a suite of examples on real data:
 Coming soon!
 
 # Repository structure
+The repository is organized into three main folders:
+
+- ```./ppi_py/```
+- ```./examples/```
+- ```./tests/```
+
+The first foler, ```./ppi_py```, contains all the code that eventually gets compiled into the ```ppi_py``` package. Most importantly, there is a file, ```./ppi_py/ppi.py```, which implements all the prediction-powered point estimates, confidence intervals, and p-values for different estimators.
+There is also a file, ```./ppi_py/baselines.py```, which implements several baselines.
+Finally, the file ```./ppi_py/datasets/datasets.py``` handles the loading of the sample datasets.
+
+The folder ```./examples``` contains notebooks for implementing prediction-powered inference on several datasets and estimands. These are listed [above](https://github.com/aangelopoulos/ppi_py/tree/main#examples). There is also an additional subfolder, ```./examples/baselines```, which contains comparisons to certain baseline algorithms, as in the appendix of the original PPI paper.
+
+The folder ```./tests``` contains unit tests for each function implemented in the ```ppi_py``` package. The tests are organized by estimand, and can be run by executing ```pytest``` in the root directory. Note that in order to be recognized by ```pytest```, all tests must be preceded by ```test_```.
+
+The remainder of the files/folders are boilerplate and not relevant to most users.
  
 # Documentation
 Coming soon!
