@@ -15,6 +15,44 @@ pip install dist/ppi_py-0.1-py3-none-any.whl
 ```
 This will build and install the most recent version of the package.
 
+## Warmup: estimating the mean
+
+To test your installation, you can try running the prediction-powered mean estimation algorithm on the ```galaxies``` dataset.
+The gold-standard labels and model predictions from the dataset will be downloaded into a folder called `./data/`.
+The labels, $Y$, are binary indicators of whether or not the galaxy is a spiral galaxy.
+The model predictions, $\hat{Y}$, are the model's estimated probability of whether the galaxy image has spiral arms.
+The inference target is $\theta = \mathbb{E}[Y]$, the fraction of spiral galaxies.
+We will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta$ with probability $1-\alpha=90\%$, i.e.,
+```math
+    \mathbb{P}\left( \theta \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 90\%.
+```
+
+The code for this is below.
+```python
+# Imports
+from ppi_py import ppi_mean_ci
+from ppi_py.datasets import load_dataset
+# Download and load dataset
+data = load_dataset('./data/', "galaxies")
+Y_total = data["Y"]; Yhat_total = data["Yhat"]
+# Set up the inference problem
+alpha = 0.1 # Error rate
+n = 1000 # Number of labeled data points
+rand_idx = np.random.permutation(Y_totals.shape[0])
+Yhat = Yhat_total[rand_idx[:n]]
+Y = Y_total[rand_idx[:n]]
+Yhat_unlabeled = Yhat_total[n:]
+# Produce the prediction-powered confidence interval
+ppi_ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alpha)
+# Print the results
+print(r'$\theta=$' + f"{Y_total.mean():.3f" + r', $\mathcal{C}_{\alpha}^{\mathrm{PP}} =$' + f"{ppi_ci}")
+```
+
+The expected results look approximately as below. Your results will differ slightly because of the random seed.
+```
+
+```
+
 # Usage
 Coming soon!
 
