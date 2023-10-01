@@ -72,8 +72,21 @@ The package somes with a suite of examples on real data:
 - Ballot Counting with Computer Vision ([```ballots.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/ballots.ipynb))
 - Income Analysis with Boosting Trees ([```census_income.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/census_income.ipynb))
 
-# Usage
-Coming soon!
+# Usage and Documentation
+There is a common template that all PPI confidence intervals follow.
+
+```python
+ppi_[ESTIMAND]_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1)
+```
+
+You can replace ```[ESTIMAND]``` with the estimand of your choice. For certain estimands, not all the arguments are required, and in this case, they are ommitted. For example, in the case of mean estimation, the function signature is:
+```python
+ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1)
+```
+
+All the prediction-powered point estimates and confidence intervals implemented so far can be imported by running ```from ppi_py import ppi_[ESTIMAND]_pointestimate, ppi_[ESTIMAND]_ci```. For the case of the mean, one can also import the p-value as ```from ppi import ppi_mean_pval```.
+
+Full documentation is available on [readthedocs]().
 
 # Repository structure
 The repository is organized into three main folders:
@@ -91,9 +104,6 @@ The folder ```./examples``` contains notebooks for implementing prediction-power
 The folder ```./tests``` contains unit tests for each function implemented in the ```ppi_py``` package. The tests are organized by estimand, and can be run by executing ```pytest``` in the root directory. Some of the tests are stochastic, and therefore, have some failure probability, even if the functions are all implemented correctly. If a test fails, it may be worth running it again. Debugging the tests can be done by adding the ```-s``` flag and using print statements or ```pdb```. Note that in order to be recognized by ```pytest```, all tests must be preceded by ```test_```.
 
 The remainder of the files/folders are boilerplate and not relevant to most users.
- 
-# Documentation
-Coming soon!
 
 # Contributing
 Thank you so much for reaching out! It's the collective efforts of the open-source community that make it such a vibrant and enriching space for everyone. Every contribution you make radiates positive impact, and we deeply value and appreciate it. Keep the spirit alive!
