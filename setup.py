@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 from pathlib import Path
 
-long_description = open('./assets/PyPI-README.md').read()
+long_description = open("./assets/PyPI-README.md").read()
 
 setup(
     name="ppi-python",
