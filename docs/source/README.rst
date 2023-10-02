@@ -7,8 +7,6 @@ In order to install the package, run
 
    pip install ppi-python
 
-This will build and install the most recent version of the package.
-
 Warmup: estimating the mean
 ---------------------------
 

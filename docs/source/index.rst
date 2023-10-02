@@ -21,7 +21,11 @@ Prediction-powered inference can be used both to produce better point estimates 
 The methods work both in the i.i.d. setting and for certain classes of distribution shifts.
 
 This package is actively maintained, and contributions from the community are welcome.
+To install the package, run the following code!
 
+.. code-block:: python
+
+   pip install ppi-python
 
 .. toctree::
    :maxdepth: 2
