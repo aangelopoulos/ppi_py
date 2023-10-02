@@ -19,8 +19,7 @@ This package is actively maintained, and contributions from the community are we
 # Getting Started 
 In order to install the package, run 
 ```python
-python setup.py sdist bdist_wheel
-pip install dist/ppi_py-0.1-py3-none-any.whl
+pip install ppi-python
 ```
 This will build and install the most recent version of the package.
 
