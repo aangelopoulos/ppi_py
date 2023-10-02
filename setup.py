@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 from pathlib import Path
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+long_description = (this_directory / "assets/PyPI_README.md").read_text()
 
 setup(
     name="ppi-python",
-    version="0.1.2",
+    version="0.1.3",
     packages=find_packages(),
     long_description=long_description,
     long_description_content_type='text/markdown',
