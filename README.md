@@ -14,7 +14,7 @@ Given a small amount of data with gold-standard labels and a large amount of unl
 Prediction-powered inference can be used both to produce better point estimates of these quantities as well as tighter confidence intervals and more powerful p-values.
 The methods work both in the i.i.d. setting and for certain classes of distribution shifts.
 
-**See the API documentation [here](https://ppi-py.readthedocs.io/en/latest/).**
+**See the API documentation [here](https://ppi-py.readthedocs.io/en/latest/) and the original paper [here](https://arxiv.org/abs/2301.09633).**
 
 This package is actively maintained, and contributions from the community are welcome.
 
