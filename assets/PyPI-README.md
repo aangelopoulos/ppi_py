@@ -1,20 +1,15 @@
 <p align="center">
-    <img src="./assets/ppi.svg?maxAge=2592000"/>
-</p>
-<p align="center">
     <a style="text-decoration:none !important;" href="https://arxiv.org/abs/2301.09633" alt="arXiv"><img src="https://img.shields.io/badge/paper-arXiv-red" /></a>
     <a style="text-decoration:none !important;" href="https://pypi.org/project/ppi-python/" alt="package management"> <img src="https://img.shields.io/badge/pip-package-blue" /></a>
     <a style="text-decoration:none !important;" href="https://ppi-py.readthedocs.io/en/latest/" alt="documentation"> <img src="https://img.shields.io/badge/API-docs-34B167" /></a>
+    <a style="text-decoration:none !important;" href="https://github.com/aangelopoulos/ppi_py" alt="License"><img src="https://img.shields.io/badge/GitHub-repo-black" /></a>
     <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License"><img src="https://img.shields.io/badge/license-MIT-750014" /></a>
-    <a style="text-decoration:none !important;" href="http://hits.dwyl.com/aangelopoulos/ppi_py" alt="hits"><img src="https://hits.dwyl.com/aangelopoulos/ppi_py.svg?style=flat-square" /></a>
 </p>
 
 Prediction-powered inference (PPI) is a framework for statistically rigorous scientific discovery using machine learning.
 Given a small amount of data with gold-standard labels and a large amount of unlabeled data, prediction-powered inference allows for the estimation of population parameters, such as the mean outcome, median outcome, linear and logistic regression coefficients.
 Prediction-powered inference can be used both to produce better point estimates of these quantities as well as tighter confidence intervals and more powerful p-values.
 The methods work both in the i.i.d. setting and for certain classes of distribution shifts.
-
-**See the API documentation [here](https://ppi-py.readthedocs.io/en/latest/) and the original paper [here](https://arxiv.org/abs/2301.09633).**
 
 This package is actively maintained, and contributions from the community are welcome.
 
@@ -33,9 +28,8 @@ The labels, $Y$, are binary indicators of whether or not the galaxy is a spiral 
 The model predictions, $\hat{Y}$, are the model's estimated probability of whether the galaxy image has spiral arms.
 The inference target is $\theta^* = \mathbb{E}[Y]$, the fraction of spiral galaxies.
 You will produce a confidence interval, $\mathcal{C}^{\mathrm{PP}}_\alpha$, which contains $\theta^*$ with probability $1-\alpha=0.9$, i.e.,
-```math
-    \mathbb{P}\left( \theta^* \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 0.9.
-```
+
+$$\mathbb{P}\left( \theta^* \in \mathcal{C}^{\mathrm{PP}}_\alpha\right) \geq 0.9.$$
 
 The code for this is below. It can be copy-pasted directly into the Python REPL.
 ```python
