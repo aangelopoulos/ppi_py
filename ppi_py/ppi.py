@@ -103,7 +103,7 @@ def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled):
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
 
     Returns:
-        float or ndarray: Prediction-powered point-estimate of the mean.
+        float or ndarray: Prediction-powered point estimate of the mean.
     """
     return _rectified_mean((Y - Yhat).mean(), Yhat_unlabeled.mean())
 
