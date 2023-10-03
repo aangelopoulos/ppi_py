@@ -358,6 +358,19 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
 
 
 def eff_ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided'):
+    """Computes the prediction-powered confidence interval for the OLS coefficients using the efficient algorithm.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
+    """
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
@@ -491,20 +504,28 @@ def ppi_logistic_ci(
         grid_radius *= 2
         grid_size *= 2
         grid_size = min(grid_size, grid_limit)
-        theta_grid = np.concatenate(
-            [
-                np.linspace(
-                    ppi_pointest - grid_radius * np.ones(d),
-                    ppi_pointest,
-                    grid_size // 2,
-                ),
-                np.linspace(
-                    ppi_pointest,
-                    ppi_pointest + grid_radius * np.ones(d),
-                    grid_size // 2,
-                )[1:],
-            ]
+        lower_limits = ppi_pointest - grid_radius * np.ones(d)
+        upper_limits = ppi_pointest + grid_radius * np.ones(d)
+        # Construct a meshgrid between lower_limits and upper_limits, each axis having grid_size points
+        theta_grid = np.meshgrid(
+            *[np.linspace(lower_limits[i], upper_limits[i], int(grid_size**(1/d))) for i in range(d)]
         )
+        theta_grid = np.concatenate(theta_grid).reshape(d, -1).T
+
+        #theta_grid = np.concatenate(
+        #    [
+        #        np.linspace(
+        #            ppi_pointest - grid_radius * np.ones(d),
+        #            ppi_pointest,
+        #            grid_size // 2,
+        #        ),
+        #        np.linspace(
+        #            ppi_pointest,
+        #            ppi_pointest + grid_radius * np.ones(d),
+        #            grid_size // 2,
+        #        )[1:],
+        #    ]
+        #)
         mu_theta = expit(X_unlabeled @ theta_grid.T)
         grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled[:, None])
         prederr_std = np.std(
@@ -532,6 +553,24 @@ def eff_ppi_logistic_ci(
     grad_tol=5e-16,  # Optimizer grad tol
     alternative='two-sided'
 ):
+    """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
+
+    There is no successive refinement in this method, which makes it more efficient than the standard method.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        step_size (float): Step size to use in the optimizer.
+        grad_tol (float): Gradient tolerance to use in the optimizer.
+        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+    """
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
