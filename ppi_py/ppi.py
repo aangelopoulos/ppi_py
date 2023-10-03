@@ -402,7 +402,6 @@ def ppi_logistic_pointestimate(
         theta -= step_size * grad
     return theta
 
-
 def ppi_logistic_ci(
     X,
     Y,
@@ -410,17 +409,11 @@ def ppi_logistic_ci(
     X_unlabeled,
     Yhat_unlabeled,
     alpha=0.1,
-    grid_size=200,
-    grid_limit=800,
-    max_refinements=10,
-    grid_radius=1,
-    grid_relative=False,
     step_size=1e-3,  # Optimizer step size
     grad_tol=5e-16,  # Optimizer grad tol
+    alternative='two-sided'
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients.
-
-    This function uses a method of successive refinement, searching over a grid of possible coeffiicents. The grid is centered at the prediction-powered point estimate. The grid is refined until the endpoints of the confidence interval are within the grid radius of the maximum likelihood estimate.
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -429,13 +422,9 @@ def ppi_logistic_ci(
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        grid_size (int): Number of grid points to initially use in the grid search.
-        grid_limit (float): Maximum absolute number of grid points.
-        max_refinements (int): Maximum number of refinements to use in the grid search.
-        grid_radius (float): Initial radius of the grid search.
-        grid_relative (bool): Whether to use a relative grid search --- i.e., whether the radius is in units scaled according to the point estimate.
         step_size (float): Step size to use in the optimizer.
         grad_tol (float): Gradient tolerance to use in the optimizer.
+        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
@@ -443,6 +432,7 @@ def ppi_logistic_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+
     ppi_pointest = ppi_logistic_pointestimate(
         X,
         Y,
@@ -452,48 +442,25 @@ def ppi_logistic_ci(
         step_size=step_size,
         grad_tol=grad_tol,
     )
-    if grid_relative:
-        grid_radius *= ppi_pointest
-    rectifier = 1 / n * X.T @ (Yhat - Y)
-    rectifier_std = np.std(X * (Yhat - Y)[:, None], axis=0)
-    confset = []
-    grid_edge_accepted = True
-    refinements = -1
-    while (len(confset) == 0) or (grid_edge_accepted == True):
-        refinements += 1
-        if refinements > max_refinements:
-            return np.array([-np.infty] * d), np.array([np.infty] * d)
-        grid_radius *= 2
-        grid_size *= 2
-        grid_size = min(grid_size, grid_limit)
-        theta_grid = np.concatenate(
-            [
-                np.linspace(
-                    ppi_pointest - grid_radius * np.ones(d),
-                    ppi_pointest,
-                    grid_size // 2,
-                ),
-                np.linspace(
-                    ppi_pointest,
-                    ppi_pointest + grid_radius * np.ones(d),
-                    grid_size // 2,
-                )[1:],
-            ]
-        )
-        mu_theta = expit(X_unlabeled @ theta_grid.T)
-        grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled[:, None])
-        prederr_std = np.std(
-            X_unlabeled[:, :, None]
-            * (mu_theta - Yhat_unlabeled[:, None])[:, None, :],
-            axis=0,
-        )
-        w = norm.ppf(1 - alpha / (2 * d)) * np.sqrt(
-            rectifier_std[:, None] ** 2 / n + prederr_std**2 / N
-        )
-        accept = np.all(np.abs(grad + rectifier[:, None]) <= w, axis=0)
-        confset = theta_grid[accept]
-        grid_edge_accepted = accept[0] or accept[-1]
-    return confset.min(axis=0), confset.max(axis=0)
+
+    mu_til = expit(X_unlabeled@ppi_pointest)
+
+    Hessian = np.zeros((d,d))
+    grads_til = np.zeros(X_unlabeled.shape)
+    for i in range(N):
+        Hessian += 1/N * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
+        grads_til[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
+
+    inv_Hessian = np.linalg.inv(Hessian)
+    var_unlabeled = np.cov(grads_til.T)
+
+    pred_error = Yhat - Y
+    grad_diff = np.diag(pred_error) @ X
+    var = np.cov(grad_diff.T)
+
+    Sigma_hat = inv_Hessian @ (n/N * var_unlabeled + var) @ inv_Hessian
+
+    return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
 
 
 """
