@@ -5,7 +5,7 @@ long_description = open("./assets/PyPI-README.md").read()
 
 setup(
     name="ppi-python",
-    version="0.1.5",
+    version="0.1.6",
     packages=find_packages(),
     include_package_data=True,
     description="Prediction-Powered Inference",
