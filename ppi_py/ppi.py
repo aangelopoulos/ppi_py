@@ -133,6 +133,30 @@ def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
     )
 
 
+def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
+    """Computes the prediction-powered confidence interval for the mean.
+
+    Args:
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
+    """
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    return _rectified_ci(
+        (Y - Yhat).mean(),
+        (Y - Yhat).std() / np.sqrt(n),
+        Yhat_unlabeled.mean(),
+        Yhat_unlabeled.std() / np.sqrt(N),
+        alpha,
+        alternative,
+    )
+
 def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
     """Computes the prediction-powered p-value for the mean.
 
@@ -383,13 +407,13 @@ def eff_ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternati
         Hessian += 1/N * np.outer(X_unlabeled[i], X_unlabeled[i])
         grads_til[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
 
-    inv_Hessian = np.linalg.inv(Hessian)
-    var_unlabeled = np.cov(grads_til.T)
+    inv_Hessian = np.linalg.inv(Hessian).reshape(d,d)
+    var_unlabeled = np.cov(grads_til.T).reshape(d,d)
 
     pred_error = Yhat - Y
     grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T)
-
+    var = np.cov(grad_diff.T).reshape(d,d)
+    
     Sigma_hat = inv_Hessian @ (n/N * var_unlabeled + var) @ inv_Hessian
 
     return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
@@ -400,8 +424,6 @@ def eff_ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternati
 
 """
 
-
-# Todo: Numba accel
 def ppi_logistic_pointestimate(
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1e-3, grad_tol=5e-16
 ):
@@ -432,6 +454,8 @@ def ppi_logistic_pointestimate(
         .fit(X, Y)
         .coef_.squeeze()
     )
+    if len(theta.shape) == 0:
+        theta = theta.reshape(1)
     mu_theta = expit(X_unlabeled @ theta)
     grad = grad_tol * np.ones(d) + 1  # Initialize to enter while loop
     while np.linalg.norm(grad) > grad_tol:
@@ -440,6 +464,31 @@ def ppi_logistic_pointestimate(
         theta -= step_size * grad
     return theta
 
+def edges_true(arr):
+    for axis in range(arr.ndim):
+        if arr.take(0, axis=axis).any() or arr.take(-1, axis=axis).any():
+            return True
+    return False
+
+def expand_contiguous_trues(grid):
+    # Find the indices of all "True" values
+    indices = np.where(grid)
+    
+    # Determine the min and max indices along each dimension
+    min_indices = [np.min(idx) for idx in indices]
+    max_indices = [np.max(idx) for idx in indices]
+    
+    # Expand the min and max indices by 1, but ensure they're within the grid bounds
+    min_indices = [max(0, idx - 1) for idx in min_indices]
+    max_indices = [min(grid.shape[i] - 1, idx + 1) for i, idx in enumerate(max_indices)]
+    
+    # Create slices for each dimension
+    slices = [slice(min_idx, max_idx + 1) for min_idx, max_idx in zip(min_indices, max_indices)]
+    
+    # Set the expanded region to "True"
+    grid[tuple(slices)] = True
+    
+    return grid
 
 def ppi_logistic_ci(
     X,
@@ -497,35 +546,24 @@ def ppi_logistic_ci(
     confset = []
     grid_edge_accepted = True
     refinements = -1
-    while (len(confset) == 0) or (grid_edge_accepted == True):
+    while (len(confset) == 0) or grid_edge_accepted:
         refinements += 1
-        if refinements > max_refinements:
+        if (refinements > max_refinements) and (len(confset) != 0):
             return np.array([-np.infty] * d), np.array([np.infty] * d)
+        elif (refinements > max_refinements):
+            break
         grid_radius *= 2
-        grid_size *= 2
+        grid_size *= 2**d 
         grid_size = min(grid_size, grid_limit)
         lower_limits = ppi_pointest - grid_radius * np.ones(d)
         upper_limits = ppi_pointest + grid_radius * np.ones(d)
         # Construct a meshgrid between lower_limits and upper_limits, each axis having grid_size points
-        theta_grid = np.meshgrid(
+        theta_grid = np.stack(np.meshgrid(
             *[np.linspace(lower_limits[i], upper_limits[i], int(grid_size**(1/d))) for i in range(d)]
-        )
-        theta_grid = np.concatenate(theta_grid).reshape(d, -1).T
+        ), axis=0)
+        orig_theta_grid_shape = theta_grid.shape
+        theta_grid = theta_grid.reshape(d, -1).T
 
-        #theta_grid = np.concatenate(
-        #    [
-        #        np.linspace(
-        #            ppi_pointest - grid_radius * np.ones(d),
-        #            ppi_pointest,
-        #            grid_size // 2,
-        #        ),
-        #        np.linspace(
-        #            ppi_pointest,
-        #            ppi_pointest + grid_radius * np.ones(d),
-        #            grid_size // 2,
-        #        )[1:],
-        #    ]
-        #)
         mu_theta = expit(X_unlabeled @ theta_grid.T)
         grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled[:, None])
         prederr_std = np.std(
@@ -537,8 +575,15 @@ def ppi_logistic_ci(
             rectifier_std[:, None] ** 2 / n + prederr_std**2 / N
         )
         accept = np.all(np.abs(grad + rectifier[:, None]) <= w, axis=0)
-        confset = theta_grid[accept]
-        grid_edge_accepted = accept[0] or accept[-1]
+        if np.any(accept):
+            accept_grid = expand_contiguous_trues(accept.reshape(*(orig_theta_grid_shape[1:])))
+            confset = theta_grid[accept_grid.flatten()]
+            grid_edge_accepted = edges_true(accept_grid)
+        else:
+            grid_edge_accepted = False
+    if len(confset) == 0:
+        discretization_width = (2*grid_radius)/int(grid_size**(1/d))
+        confset = np.stack([ppi_pointest - discretization_width, ppi_pointest + discretization_width], axis=0)
     return confset.min(axis=0), confset.max(axis=0)
 
 
@@ -593,12 +638,12 @@ def eff_ppi_logistic_ci(
         Hessian += 1/N * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
         grads_til[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
 
-    inv_Hessian = np.linalg.inv(Hessian)
-    var_unlabeled = np.cov(grads_til.T)
+    inv_Hessian = np.linalg.inv(Hessian).reshape(d,d)
+    var_unlabeled = np.cov(grads_til.T).reshape(d,d)
 
     pred_error = Yhat - Y
     grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T)
+    var = np.cov(grad_diff.T).reshape(d,d)
 
     Sigma_hat = inv_Hessian @ (n/N * var_unlabeled + var) @ inv_Hessian
 
