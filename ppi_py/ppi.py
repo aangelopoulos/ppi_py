@@ -448,39 +448,33 @@ def eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alt
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
 
-    Yhat_copy = Yhat.copy()
-    Yhat_unlabeled_copy = Yhat_unlabeled.copy()
-
-    if lhat is not None:
-        Yhat_copy *= lhat
-        Yhat_unlabeled_copy *= lhat
-
-    ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat_copy, X_unlabeled, Yhat_unlabeled_copy)
+    if lhat is None:
+        ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
+    else:
+        ppi_pointest = ppi_ols_pointestimate(X, Y, lhat*Yhat, X_unlabeled, lhat*Yhat_unlabeled)
 
     hessian = np.zeros((d,d))
     grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
     for i in range(N):
-        hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i])
-        grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled_copy[i])
+        hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i]) if lhat != 0 else 0
+        grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
 
     grads = np.zeros(X.shape)
     grads_hat = np.zeros(X.shape)
     for i in range(n):
-        hessian += 1/(N+n) * np.outer(X[i], X[i])
+        hessian += 1/(N+n) * np.outer(X[i], X[i]) if lhat != 0 else 1/n * np.outer(X[i], X[i])
         grads[i,:] = X[i,:]*(np.dot(X[i,:], ppi_pointest) - Y[i])
-        grads_hat[i,:] = X[i,:]*(np.dot(X[i,:], ppi_pointest) - Yhat_copy[i])
+        grads_hat[i,:] = X[i,:]*(np.dot(X[i,:], ppi_pointest) - Yhat[i])
 
     inv_hessian = np.linalg.inv(hessian).reshape(d,d)
 
     if lhat is None:
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, hessian, coord)
-        return eff_ppi_ols_ci_tuned(X, Y, Yhat_copy, X_unlabeled, Yhat_unlabeled_copy, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
+        return eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
 
     var_unlabeled = np.cov(grads_hat_unlabeled.T).reshape(d,d)
 
-    pred_error = Yhat_copy - Y
-    grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T).reshape(d,d)
+    var = np.cov(grads.T - lhat*grads_hat.T).reshape(d,d)
 
     Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
 
@@ -771,16 +765,15 @@ def _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=Non
     var_grads_hat = np.cov(np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T)
 
     if coord is None:
-        vhat = inv_hessian @ np.ones(d)
+        vhat = inv_hessian
     else:
         vhat = inv_hessian @ np.eye(d)[coord]
 
-    num = vhat @ cov_grads @ vhat
-    denom = 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
+    num = np.trace(vhat @ cov_grads @ vhat) if coord is None else vhat @ cov_grads @ vhat
+    denom = 2*(1+(n/N)) * np.trace(vhat @ var_grads_hat @ vhat) if coord is None else 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
 
     lhat = num/denom
     return lhat
-
 
 def eff_ppi_logistic_ci_tuned(
     X,
@@ -836,13 +829,13 @@ def eff_ppi_logistic_ci_tuned(
     hessian = np.zeros((d,d))
     grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
     for i in range(N):
-        hessian += 1/(N + n) * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
+        hessian += 1/(N + n) * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i]) if lhat != 0 else 0
         grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
 
     grads = np.zeros(X.shape)
     grads_hat = np.zeros(X.shape)
     for i in range(n):
-        hessian += 1/(N + n) * mu[i] * (1-mu[i]) * np.outer(X[i], X[i])
+        hessian += 1/(N + n) * mu[i] * (1-mu[i]) * np.outer(X[i], X[i]) if lhat != 0 else 1/n * mu[i] * (1-mu[i]) * np.outer(X[i], X[i])
         grads[i,:] = X[i,:]*(mu[i] - Y[i])
         grads_hat[i,:] = X[i,:]*(mu[i] - Yhat[i])
 
@@ -852,15 +845,9 @@ def eff_ppi_logistic_ci_tuned(
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian)
         return eff_ppi_logistic_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, step_size=step_size, grad_tol=grad_tol, alternative=alternative, lhat=lhat, coord=coord)
 
-    else:
-        grads_hat *= lhat
-        grads_hat_unlabeled *= lhat
+    var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
-    var_unlabeled = np.cov(grads_hat_unlabeled.T).reshape(d,d)
-
-    pred_error = Yhat - Y
-    grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T).reshape(d,d)
+    var = np.cov(grads.T - lhat*grads_hat.T).reshape(d,d)
 
     Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
 
