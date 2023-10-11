@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm, binom
 from scipy.special import expit
-from scipy.optimize import brentq
+from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
@@ -12,7 +12,26 @@ from .utils import (
     form_discrete_distribution,
 )
 import pdb
+import cProfile
+import pstats
+from functools import wraps
+from tqdm import tqdm
+import io
 
+def profile(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        data = io.StringIO()
+        profiler = cProfile.Profile()
+        profiler.enable()
+        result = func(*args, **kwargs)
+        profiler.disable()
+        stats = pstats.Stats(profiler, stream=data).sort_stats('cumulative')
+        stats.print_stats()
+        print(data.getvalue())
+        return result
+
+    return wrapper
 
 def _rectified_mean(rectifier, imputed_mean):
     """Computes a rectified mean.
@@ -154,7 +173,7 @@ def ppi_mean_ci_tuned(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided
         # Estimate lambda
         cov_y_yhat = np.cov(Y, Yhat)[0,1]
         var_yhat = np.var(np.concatenate((Yhat, Yhat_unlabeled)))
-        lhat = cov_y_yhat/((1 + n/N)*var_yhat)
+        lhat = np.clip(cov_y_yhat/((1 + n/N)*var_yhat), 0, 1)
 
     return _rectified_ci(
         (Y - lhat*Yhat).mean(),
@@ -455,9 +474,10 @@ def eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alt
 
     hessian = np.zeros((d,d))
     grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
-    for i in range(N):
-        hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i]) if lhat != 0 else 0
-        grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
+    if lhat != 0:
+        for i in range(N):
+            hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i])
+            grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
 
     grads = np.zeros(X.shape)
     grads_hat = np.zeros(X.shape)
@@ -472,7 +492,7 @@ def eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alt
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, hessian, coord)
         return eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
 
-    var_unlabeled = np.cov(grads_hat_unlabeled.T).reshape(d,d)
+    var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
     var = np.cov(grads.T - lhat*grads_hat.T).reshape(d,d)
 
@@ -507,7 +527,7 @@ def ppi_logistic_pointestimate(
     rectifier = 1 / n * X.T @ (Yhat - Y)
     theta = (
         LogisticRegression(
-            penalty="none",
+            penalty=None,
             solver="lbfgs",
             max_iter=10000,
             tol=1e-15,
@@ -526,8 +546,22 @@ def ppi_logistic_pointestimate(
         theta -= step_size * grad
     return theta
 
+def safe_expit(x):
+    """Computes the sigmoid function in a numerically stable way."""
+    return np.exp(-np.logaddexp(0, -x))
+
+def safe_log1pexp(x):
+    """
+    Compute log(1 + exp(x)) in a numerically stable way.
+    """
+    idxs = x > 10
+    out = np.empty_like(x)
+    out[idxs] = x[idxs]
+    out[~idxs] = np.log1p(np.exp(x[~idxs]))
+    return out
+
 def ppi_logistic_pointestimate_tuned(
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1e-3, grad_tol=5e-16, lhat=None
+    X, Y, Yhat, X_unlabeled, Yhat_unlabeled, optimizer_options=None, lhat=None
 ):
     """Computes the prediction-powered point estimate of the logistic regression coefficients.
 
@@ -537,6 +571,7 @@ def ppi_logistic_pointestimate_tuned(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         lhat (float): Tuning parameter for how much to factor in the model predictions. Defaults to the standard prediction-powered point-estimate.
 
     Returns:
@@ -546,9 +581,10 @@ def ppi_logistic_pointestimate_tuned(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     lhat = 1 if lhat is None else lhat
+    # Initialize theta
     theta = (
         LogisticRegression(
-            penalty="none",
+            penalty=None,
             solver="lbfgs",
             max_iter=10000,
             tol=1e-15,
@@ -559,14 +595,19 @@ def ppi_logistic_pointestimate_tuned(
     )
     if len(theta.shape) == 0:
         theta = theta.reshape(1)
-    grad = grad_tol * np.ones(d) + 1  # Initialize to enter while loop
-    while np.linalg.norm(grad) > grad_tol:
-        mu_theta = expit(X @ theta)
-        mu_theta_unlabeled = expit(X_unlabeled @ theta)
-        grad = lhat / N * X_unlabeled.T @ (mu_theta_unlabeled - Yhat_unlabeled) + \
-               1 / n * X.T @ (mu_theta - Y) - \
-               lhat / n * X.T @ (mu_theta - Yhat)
-        theta -= step_size * grad
+
+    def rectified_logistic_loss(_theta):
+        return lhat/N * np.sum( -Yhat_unlabeled * (X_unlabeled@_theta) + safe_log1pexp(X_unlabeled@_theta) )  - \
+                lhat/n * np.sum( -Yhat * (X@_theta) + safe_log1pexp(X@_theta) ) + \
+                1/n * np.sum( -Y * (X@_theta) + safe_log1pexp(X@_theta) )
+
+    def rectified_logistic_grad(_theta):
+        return lhat/N * X_unlabeled.T @ (safe_expit(X_unlabeled@_theta) - Yhat_unlabeled) - \
+                lhat/n * X.T @ (safe_expit(X@_theta) - Yhat) + \
+                1/n * X.T @ (safe_expit(X@_theta) - Y)
+
+    theta = minimize(rectified_logistic_loss, theta, jac=rectified_logistic_grad, method='L-BFGS-B', tol=optimizer_options['ftol'], options=optimizer_options).x
+
     return theta
 
 def edges_true(arr):
@@ -771,8 +812,10 @@ def _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=Non
 
     num = np.trace(vhat @ cov_grads @ vhat) if coord is None else vhat @ cov_grads @ vhat
     denom = 2*(1+(n/N)) * np.trace(vhat @ var_grads_hat @ vhat) if coord is None else 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
-
+    
     lhat = num/denom
+
+    lhat = np.clip(num/denom, 0, 1)
     return lhat
 
 def eff_ppi_logistic_ci_tuned(
@@ -782,11 +825,10 @@ def eff_ppi_logistic_ci_tuned(
     X_unlabeled,
     Yhat_unlabeled,
     alpha=0.1,
-    step_size=1e-3,  # Optimizer step size
-    grad_tol=5e-16,  # Optimizer grad tol
     alternative='two-sided',
     lhat=None,
-    coord=None
+    coord=None,
+    optimizer_options=None
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
 
@@ -799,11 +841,10 @@ def eff_ppi_logistic_ci_tuned(
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        step_size (float): Step size to use in the optimizer.
-        grad_tol (float): Gradient tolerance to use in the optimizer.
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
         lhat (float): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
         coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
@@ -818,9 +859,8 @@ def eff_ppi_logistic_ci_tuned(
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        step_size=step_size,
-        grad_tol=grad_tol,
-        lhat=lhat
+        optimizer_options=optimizer_options,
+        lhat=lhat,
     )
 
     mu = expit(X@ppi_pointest)
@@ -843,7 +883,7 @@ def eff_ppi_logistic_ci_tuned(
 
     if lhat is None:
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian)
-        return eff_ppi_logistic_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, step_size=step_size, grad_tol=grad_tol, alternative=alternative, lhat=lhat, coord=coord)
+        return eff_ppi_logistic_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, optimizer_options=optimizer_options, alternative=alternative, lhat=lhat, coord=coord)
 
     var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
