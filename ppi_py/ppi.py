@@ -580,6 +580,9 @@ def ppi_logistic_pointestimate_tuned(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+    if optimizer_options is None:
+        optimizer_options = {}
+        optimizer_options['ftol'] = 1e-15
     lhat = 1 if lhat is None else lhat
     # Initialize theta
     theta = (
@@ -648,8 +651,7 @@ def ppi_logistic_ci(
     max_refinements=10,
     grid_radius=1,
     grid_relative=False,
-    step_size=1e-3,  # Optimizer step size
-    grad_tol=5e-16,  # Optimizer grad tol
+    optimizer_options=None
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients.
 
@@ -676,14 +678,13 @@ def ppi_logistic_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
-    ppi_pointest = ppi_logistic_pointestimate(
+    ppi_pointest = ppi_logistic_pointestimate_tuned(
         X,
         Y,
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        step_size=step_size,
-        grad_tol=grad_tol,
+        optimizer_options=optimizer_options
     )
     if grid_relative:
         grid_radius *= ppi_pointest
@@ -699,7 +700,7 @@ def ppi_logistic_ci(
         elif (refinements > max_refinements):
             break
         grid_radius *= 2
-        grid_size *= 2**d
+        grid_size *= 2#**d
         grid_size = min(grid_size, grid_limit)
         lower_limits = ppi_pointest - grid_radius * np.ones(d)
         upper_limits = ppi_pointest + grid_radius * np.ones(d)
@@ -740,8 +741,7 @@ def eff_ppi_logistic_ci(
     X_unlabeled,
     Yhat_unlabeled,
     alpha=0.1,
-    step_size=1e-3,  # Optimizer step size
-    grad_tol=5e-16,  # Optimizer grad tol
+    optimizer_options=None,
     alternative='two-sided'
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
@@ -766,14 +766,13 @@ def eff_ppi_logistic_ci(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
 
-    ppi_pointest = ppi_logistic_pointestimate(
+    ppi_pointest = ppi_logistic_pointestimate_tuned(
         X,
         Y,
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        step_size=step_size,
-        grad_tol=grad_tol,
+        optimizer_options=optimizer_options
     )
 
     mu_til = expit(X_unlabeled@ppi_pointest)
@@ -785,6 +784,7 @@ def eff_ppi_logistic_ci(
         grads_hat[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
 
     inv_hessian = np.linalg.inv(hessian).reshape(d,d)
+
     var_unlabeled = np.cov(grads_hat.T).reshape(d,d)
 
     pred_error = Yhat - Y
@@ -812,7 +812,7 @@ def _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=Non
 
     num = np.trace(vhat @ cov_grads @ vhat) if coord is None else vhat @ cov_grads @ vhat
     denom = 2*(1+(n/N)) * np.trace(vhat @ var_grads_hat @ vhat) if coord is None else 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
-    
+
     lhat = num/denom
 
     lhat = np.clip(num/denom, 0, 1)
