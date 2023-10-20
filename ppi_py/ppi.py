@@ -33,50 +33,6 @@ def profile(func):
 
     return wrapper
 
-def _rectified_mean(rectifier, imputed_mean):
-    """Computes a rectified mean.
-
-    Rectified mean is the sum of the rectifier and the imputed mean.
-
-    Args:
-        rectifier (float or ndarray): Rectifier value.
-        imputed_mean (float or ndarray): Imputed mean.
-
-    Returns:
-        float or ndarray: Rectified mean.
-
-    """
-    return imputed_mean + rectifier
-
-
-def _rectified_ci(
-    rectifier,
-    rectifier_std,
-    imputed_mean,
-    imputed_std,
-    alpha,
-    alternative="two-sided",
-):
-    """Computes a rectified confidence interval.
-
-    Args:
-        rectifier (float or ndarray): Rectifier value.
-        rectifier_std (float or ndarray): Rectifier standard deviation.
-        imputed_mean (float or ndarray): Imputed mean.
-        imputed_std (float or ndarray): Imputed standard deviation.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-
-    Returns:
-        tuple: Lower and upper bounds of the confidence interval.
-    """
-    rectified_point_estimate = imputed_mean + rectifier
-    rectified_std = np.sqrt(imputed_std**2 + rectifier_std**2)
-    return _zconfint_generic(
-        rectified_point_estimate, rectified_std, alpha, alternative
-    )
-
-
 def _rectified_p_value(
     rectifier,
     rectifier_std,
@@ -113,21 +69,30 @@ def _rectified_p_value(
 """
 
 
-def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled):
+def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None):
     """Computes the prediction-powered point estimate of the mean.
 
     Args:
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray): Sample weights for the labeled data set. Defaults to all ones vector.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
     Returns:
         float or ndarray: Prediction-powered point estimate of the mean.
     """
-    return _rectified_mean((Y - Yhat).mean(), Yhat_unlabeled.mean())
+    w = np.ones(Y.shape[0]) if w is None else w
+    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled
+    if lhat is None:
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None)
+    return (w*(Y - lhat*Yhat)).mean() + (w_unlabeled*lhat*Yhat_unlabeled).mean()
 
 
-def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
+# TODO: Multi-dimensional mean?
+def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lhat=None, coord=None, w=None, w_unlabeled=None):
     """Computes the prediction-powered confidence interval for the mean.
 
     Args:
@@ -136,38 +101,18 @@ def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided"):
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    return _rectified_ci(
-        (Y - Yhat).mean(),
-        (Y - Yhat).std() / np.sqrt(n),
-        Yhat_unlabeled.mean(),
-        Yhat_unlabeled.std() / np.sqrt(N),
-        alpha,
-        alternative,
-    )
-
-
-def ppi_mean_ci_tuned(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lhat=None):
-    """Computes the prediction-powered confidence interval for the mean.
-
-    Args:
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
-    """
-    n = Y.shape[0]
-    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled
 
     if lhat is None:
         # Estimate lambda
@@ -175,13 +120,18 @@ def ppi_mean_ci_tuned(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided
         var_yhat = np.var(np.concatenate((Yhat, Yhat_unlabeled)))
         lhat = np.clip(cov_y_yhat/((1 + n/N)*var_yhat), 0, 1)
 
-    return _rectified_ci(
-        (Y - lhat*Yhat).mean(),
-        (Y - lhat*Yhat).std() / np.sqrt(n),
-        lhat*Yhat_unlabeled.mean(),
-        lhat*Yhat_unlabeled.std() / np.sqrt(N),
-        alpha,
-        alternative,
+    imputed_i = w_unlabeled*(lhat * Yhat_unlabeled)
+    rectifier_i = w*(Y - lhat*Yhat)
+
+    imputed = imputed.mean()
+    imputed_std = imputed.std()
+    rectifier = rectifier_i.mean()
+    rectifier_std = rectifier_i.std()
+
+    ppi_pointest = imputed_mean + rectifier
+
+    return _zconfint_generic(
+        ppi_pointest, np.sqrt(imputed_std**2 + rectifier_std**2), alpha, alternative
     )
 
 def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
@@ -358,8 +308,31 @@ def _ols(X, Y, return_se=False):
     else:
         return theta
 
+def _wls(X, Y, w=None, return_se=False):
+    """Computes the weighted least squares estimate of the coefficients.
 
-def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
+    Args:
+        X (ndarray): Covariates.
+        Y (ndarray): Labels.
+        w (ndarray): Sample weights.
+        return_se (bool): Whether to return the standard errors.
+
+    Returns:
+        theta (ndarray): Weighted least squares estimate of the coefficients.
+        se (ndarray): If return_se==True, returns the standard errors of the coefficients.
+    """
+    if w is None:
+        return _ols(X, Y, return_se=return_se)
+
+    regression = WLS(Y, exog=X, weights=w).fit()
+    theta = regression.params
+    if return_se:
+        return theta, regression.HC0_se
+    else:
+        return theta
+
+
+def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None):
     """Computes the prediction-powered point estimate of the OLS coefficients.
 
     Args:
@@ -368,18 +341,26 @@ def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lhat (float): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
     """
-    imputed_theta = _ols(X_unlabeled, Yhat_unlabeled)
-    rectifier = _ols(X, Y - Yhat)
+    if w is None:
+        w = np.ones(Y.shape[0])
+    if w_unlabeled is None:
+        w_unlabeled = np.ones(Y_unlabeled.shape[0])
+    imputed_theta = _wls(X_unlabeled, Yhat_unlabeled, w=w_unlabeled)
+    rectifier = _wls(X, Y - Yhat, w=w)
     theta_pp = imputed_theta + rectifier
     return theta_pp
 
 
-def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
-    """Computes the prediction-powered confidence interval for the OLS coefficients.
+def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided', lhat=None, coord=None):
+    """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -388,76 +369,8 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1):
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
-    """
-    n = Y.shape[0]
-    N = Yhat_unlabeled.shape[0]
-    imputed_theta, imputed_se = _ols(
-        X_unlabeled, Yhat_unlabeled, return_se=True
-    )
-    rectifier, rectifier_se = _ols(X, Y - Yhat, return_se=True)
-    return _rectified_ci(
-        imputed_theta,
-        imputed_se,
-        rectifier,
-        rectifier_se,
-        alpha,
-        alternative="two-sided",
-    )
-
-
-def eff_ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided'):
-    """Computes the prediction-powered confidence interval for the OLS coefficients using the efficient algorithm.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
-    """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-
-    ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
-
-    hessian = np.zeros((d,d))
-    grads_hat = np.zeros(X_unlabeled.shape)
-    for i in range(N):
-        hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i])
-        grads_hat[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
-
-    for i in range(n):
-        hessian += 1/(N+n) * np.outer(X[i], X[i])
-
-    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
-    var_unlabeled = np.cov(grads_hat.T).reshape(d,d)
-
-    pred_error = Yhat - Y
-    grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T).reshape(d,d)
-
-    Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
-
-    return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
-
-def eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided', lhat=None, coord=None):
-    """Computes the prediction-powered confidence interval for the OLS coefficients using the efficient algorithm.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
         coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
 
     Returns:
@@ -489,8 +402,8 @@ def eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alt
     inv_hessian = np.linalg.inv(hessian).reshape(d,d)
 
     if lhat is None:
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, hessian, coord)
-        return eff_ppi_ols_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord)
+        return ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
 
     var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
@@ -892,83 +805,6 @@ def eff_ppi_logistic_ci_tuned(
     Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
 
     return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
-
-"""
-    ORDINARY LEAST SQUARES UNDER COVARIATE SHIFT
-
-"""
-
-
-def _wls(X, Y, w, return_se=False):
-    """Computes the weighted least squares estimate of the coefficients.
-
-    Args:
-        X (ndarray): Covariates.
-        Y (ndarray): Labels.
-        w (ndarray): Weights.
-        return_se (bool): Whether to return the standard errors.
-
-    Returns:
-        theta (ndarray): Weighted least squares estimate of the coefficients.
-        se (ndarray): If return_se==True, returns the standard errors of the coefficients.
-    """
-    regression = WLS(Y, exog=X, weights=w).fit()
-    theta = regression.params
-    if return_se:
-        return theta, regression.HC0_se
-    else:
-        return theta
-
-
-def ppi_ols_covshift_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w):
-    """Computes the prediction-powered point estimate for the ordinary least squares coefficients under covariate shift.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-
-    Returns:
-        theta_pp (ndarray): Prediction-powered point estimate for the ordinary least squares coefficients under covariate shift.
-    """
-    imputed_theta = _wls(X_unlabeled, Yhat_unlabeled)
-    rectifier = _wls(X, Y - Yhat, w)
-    theta_pp = imputed_theta + rectifier
-    return theta_pp
-
-
-def ppi_ols_covshift_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, alpha=0.1):
-    """Computes the prediction-powered confidence interval for the ordinary least squares coefficients under covariate shift.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        w (ndarray): Weights.
-        alpha (float): Significance level.
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the ordinary least squares coefficients under covariate shift.
-    """
-    n = Y.shape[0]
-    N = Yhat_unlabeled.shape[0]
-    imputed_theta, imputed_se = _ols(
-        X_unlabeled, Yhat_unlabeled, return_se=True
-    )
-    rectifier, rectifier_se = _wls(X, Y - Yhat, w, return_se=True)
-    return _rectified_ci(
-        imputed_theta,
-        imputed_se,
-        rectifier,
-        rectifier_se,
-        alpha,
-        alternative="two-sided",
-    )
-
 
 """
     DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT ʕ·ᴥ·ʔ
