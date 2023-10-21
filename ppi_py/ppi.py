@@ -1,4 +1,5 @@
 import numpy as np
+from numba import njit
 from scipy.stats import norm, binom
 from scipy.special import expit
 from scipy.optimize import brentq, minimize
@@ -12,26 +13,9 @@ from .utils import (
     form_discrete_distribution,
 )
 import pdb
-import cProfile
-import pstats
 from functools import wraps
 from tqdm import tqdm
 import io
-
-def profile(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        data = io.StringIO()
-        profiler = cProfile.Profile()
-        profiler.enable()
-        result = func(*args, **kwargs)
-        profiler.disable()
-        stats = pstats.Stats(profiler, stream=data).sort_stats('cumulative')
-        stats.print_stats()
-        print(data.getvalue())
-        return result
-
-    return wrapper
 
 def _rectified_p_value(
     rectifier,
@@ -84,15 +68,20 @@ def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=Non
     Returns:
         float or ndarray: Prediction-powered point estimate of the mean.
     """
-    w = np.ones(Y.shape[0]) if w is None else w
-    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled
+    w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
+    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * Yhat_unlabeled.shape[0]
     if lhat is None:
+        ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean() 
+        grads = w * (Y - ppi_pointest)
+        grads_hat = w * (Yhat - ppi_pointest)
+        grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
+        inv_hessian = np.ones((1,1))
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None)
-    return (w*(Y - lhat*Yhat)).mean() + (w_unlabeled*lhat*Yhat_unlabeled).mean()
+        return ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
+    else:
+        return (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean() 
 
-
-# TODO: Multi-dimensional mean?
-def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lhat=None, coord=None, w=None, w_unlabeled=None):
+def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lhat=None, coord=None, w=None, w_unlabeled=None, one_step=False):
     """Computes the prediction-powered confidence interval for the mean.
 
     Args:
@@ -111,31 +100,35 @@ def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lha
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w
-    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled
+    d = Y.shape[1] if len(Y.shape) > 1 else 1
+    w = np.ones(n) if w is None else w/w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum() * N
 
     if lhat is None:
-        # Estimate lambda
-        cov_y_yhat = np.cov(Y, Yhat)[0,1]
-        var_yhat = np.var(np.concatenate((Yhat, Yhat_unlabeled)))
-        lhat = np.clip(cov_y_yhat/((1 + n/N)*var_yhat), 0, 1)
+        ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean() 
+        grads = w * (Y - ppi_pointest)
+        grads_hat = w * (Yhat - ppi_pointest)
+        grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
+        inv_hessian = np.eye(d)
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None)
+        return ppi_mean_ci(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
 
     imputed_i = w_unlabeled*(lhat * Yhat_unlabeled)
     rectifier_i = w*(Y - lhat*Yhat)
 
-    imputed = imputed.mean()
-    imputed_std = imputed.std()
+    imputed = imputed_i.mean()
+    imputed_std = imputed_i.std() / np.sqrt(N)
     rectifier = rectifier_i.mean()
-    rectifier_std = rectifier_i.std()
+    rectifier_std = rectifier_i.std() / np.sqrt(n)
 
-    ppi_pointest = imputed_mean + rectifier
+    ppi_pointest = imputed + rectifier
 
     return _zconfint_generic(
         ppi_pointest, np.sqrt(imputed_std**2 + rectifier_std**2), alpha, alternative
     )
 
-def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
-    """Computes the prediction-powered p-value for the mean.
+def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided", lhat=None, w=None, w_unlabeled=None):
+    """Computes the prediction-powered p-value for a 1D mean.
 
     Args:
         Y (ndarray): Gold-standard labels.
@@ -143,17 +136,35 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         null (float): Value of the null hypothesis to be tested.
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         float or ndarray: Prediction-powered p-value for the mean.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+
+    if lhat is None:
+        if len(Y.shape) > 1 and Y.shape[1] > 1:
+            lhat = 1
+        else:
+            ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean() 
+            grads = w * (Y - ppi_pointest)
+            grads_hat = w * (Yhat - ppi_pointest)
+            grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
+            inv_hessian = np.ones((1,1))
+            lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None)
+            return ppi_mean_ci(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
+
     return _rectified_p_value(
-        (Y - Yhat).mean(),
-        (Y - Yhat).std() / np.sqrt(n),
-        Yhat_unlabeled.mean(),
-        Yhat_unlabeled.std() / np.sqrt(N),
+        (w*Y - lhat*w*Yhat).mean(),
+        (w*Y - lhat*w*Yhat).std() / np.sqrt(n),
+        (w_unlabeled*Yhat_unlabeled).mean(),
+        (w_unlabeled*Yhat_unlabeled).std() / np.sqrt(N),
         null,
         alternative,
     )
@@ -165,39 +176,43 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided"):
 """
 
 
-def _compute_cdf(Y, grid):
+def _compute_cdf(Y, grid, w=None):
     """Computes the empirical CDF of the data.
 
     Args:
         Y (ndarray): Data.
         grid (ndarray): Grid of values to compute the CDF at.
+        w (ndarray): Sample weights.
 
     Returns:
         tuple: Empirical CDF and its standard deviation at the specified grid points.
     """
-    indicators = (Y[:, None] <= grid[None, :]).astype(float)
+    w = np.ones(Y.shape[0]) if w is None else w/w.sum() * Y.shape[0]
+    indicators = w*(Y[:, None] <= grid[None, :]).astype(float)
     return indicators.mean(axis=0), indicators.std(axis=0)
 
 
-def _compute_cdf_diff(Y, Yhat, grid):
+def _compute_cdf_diff(Y, Yhat, grid, w=None):
     """Computes the difference between the empirical CDFs of the data and the predictions.
 
     Args:
         Y (ndarray): Data.
         Yhat (ndarray): Predictions.
         grid (ndarray): Grid of values to compute the CDF at.
+        w (ndarray): Sample weights.
 
     Returns:
         tuple: Difference between the empirical CDFs of the data and the predictions and its standard deviation at the specified grid points.
     """
+    w = np.ones(Y.shape[0]) if w is None else w/w.sum() * Y.shape[0]
     indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
     indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
-    return (indicators_Y - indicators_Yhat).mean(axis=0), (
-        indicators_Y - indicators_Yhat
+    return (w*(indicators_Y - indicators_Yhat)).mean(axis=0), (
+        w*(indicators_Y - indicators_Yhat)
     ).std(axis=0)
 
 
-def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid):
+def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
     """Computes the rectified CDF of the data.
 
     Args:
@@ -205,16 +220,20 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid):
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         grid (ndarray): Grid of values to compute the CDF at.
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         ndarray: Rectified CDF of the data at the specified grid points.
     """
-    cdf_Yhat_unlabeled, _ = _compute_cdf(Yhat_unlabeled, grid)
-    cdf_rectifier, _ = _compute_cdf_diff(Y, Yhat, grid)
+    w = np.ones(Y.shape[0]) if w is None else w/w.sum() * Y.shape[0]
+    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum() * Yhat_unlabeled.shape[0]
+    cdf_Yhat_unlabeled, _ = _compute_cdf(Yhat_unlabeled, grid, w=w_unlabeled)
+    cdf_rectifier, _ = _compute_cdf_diff(Y, Yhat, grid, w=w)
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
-def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
+def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False, w=None, w_unlabeled=None):
     """Computes the prediction-powered point estimate of the quantile.
 
     Args:
@@ -223,17 +242,21 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         q (float): Quantile to estimate.
         exact_grid (bool): Whether to compute the exact solution (True) or an approximate solution based on a linearly spaced grid of 5000 values (False).
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         float: Prediction-powered point estimate of the quantile.
     """
     assert len(Y.shape) == 1
+    w = np.ones(Y.shape[0]) if w is None else w/w.sum() * Y.shape[0]
+    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum() * Yhat_unlabeled.shape[0]
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
     if exact_grid:
         grid = np.sort(grid)
     else:
         grid = np.linspace(grid.min(), grid.max(), 5000)
-    rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid)
+    rectified_cdf = _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=w, w_unlabeled=w_unlabeled)
     minimizers = np.argmin(np.abs(rectified_cdf - q))
     minimizer = (
         minimizers
@@ -245,7 +268,7 @@ def ppi_quantile_pointestimate(Y, Yhat, Yhat_unlabeled, q, exact_grid=False):
     ]  # Find the intersection of the rectified CDF and the quantile
 
 
-def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False):
+def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False, w=None, w_unlabeled=None):
     """Computes the prediction-powered confidence interval for the quantile.
 
     Args:
@@ -255,21 +278,26 @@ def ppi_quantile_ci(Y, Yhat, Yhat_unlabeled, q, alpha=0.1, exact_grid=False):
         q (float): Quantile to estimate. Must be in the range (0, 1).
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         exact_grid (bool): Whether to use the exact grid of values or a linearly spaced grid of 5000 values.
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the quantile.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w/w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum() * N
+
     grid = np.concatenate([Y, Yhat, Yhat_unlabeled], axis=0)
     if exact_grid:
         grid = np.sort(grid)
     else:
         grid = np.linspace(grid.min(), grid.max(), 5000)
     cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = _compute_cdf(
-        Yhat_unlabeled, grid
+        Yhat_unlabeled, grid, w=w_unlabeled
     )
-    cdf_rectifier, cdf_rectifier_std = _compute_cdf_diff(Y, Yhat, grid)
+    cdf_rectifier, cdf_rectifier_std = _compute_cdf_diff(Y, Yhat, grid, w=w)
     # Calculate rectified p-value for null that the rectified cdf is equal to q
     rectified_p_value = _rectified_p_value(
         cdf_rectifier,
@@ -321,7 +349,7 @@ def _wls(X, Y, w=None, return_se=False):
         theta (ndarray): Weighted least squares estimate of the coefficients.
         se (ndarray): If return_se==True, returns the standard errors of the coefficients.
     """
-    if w is None:
+    if w is None or np.all(w == 1):
         return _ols(X, Y, return_se=return_se)
 
     regression = WLS(Y, exog=X, weights=w).fit()
@@ -330,6 +358,50 @@ def _wls(X, Y, w=None, return_se=False):
         return theta, regression.HC0_se
     else:
         return theta
+
+@njit
+def _ols_get_stats(pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w=None, w_unlabeled=None, use_unlabeled=True):
+    """Computes the statistics needed for the OLS-based prediction-powered inference.
+
+    Args:
+        pointest (ndarray): A point estimate of the coefficients.
+        X (ndarray): Covariates for the labeled data set.
+        Y (ndarray): Labels for the labeled data set.
+        Yhat (ndarray): Predictions for the labeled data set.
+        X_unlabeled (ndarray): Covariates for the unlabeled data set.
+        Yhat_unlabeled (ndarray): Predictions for the unlabeled data set.
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
+        use_unlabeled (bool): Whether to use the unlabeled data set.
+        
+    Returns:
+        grads (ndarray): Gradient of the loss function with respect to the coefficients.
+        grads_hat (ndarray): Gradient of the loss function with respect to the coefficients, evaluated using the labeled predictions.
+        grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the coefficients, evaluated using the unlabeled predictions.
+        inv_hessian (ndarray): Inverse Hessian of the loss function with respect to the coefficients.
+    """
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    d = X.shape[1]
+    w = np.ones(n) if w is None else w/np.sum(w) * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/np.sum(w_unlabeled) * N
+
+    hessian = np.zeros((d,d))
+    grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
+    if use_unlabeled:
+        for i in range(N):
+            hessian += w_unlabeled[i]/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i])
+            grads_hat_unlabeled[i,:] = w_unlabeled[i]*X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], pointest) - Yhat_unlabeled[i])
+
+    grads = np.zeros(X.shape)
+    grads_hat = np.zeros(X.shape)
+    for i in range(n):
+        hessian += w[i]/(N+n) * np.outer(X[i], X[i]) if use_unlabeled else w[i]/n * np.outer(X[i], X[i])
+        grads[i,:] = w[i]*X[i,:]*(np.dot(X[i,:], pointest) - Y[i])
+        grads_hat[i,:] = w[i]*X[i,:]*(np.dot(X[i,:], pointest) - Yhat[i])
+
+    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
+    return grads, grads_hat, grads_hat_unlabeled, inv_hessian
 
 
 def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None):
@@ -349,17 +421,25 @@ def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=None, co
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
     """
-    if w is None:
-        w = np.ones(Y.shape[0])
-    if w_unlabeled is None:
-        w_unlabeled = np.ones(Y_unlabeled.shape[0])
-    imputed_theta = _wls(X_unlabeled, Yhat_unlabeled, w=w_unlabeled)
-    rectifier = _wls(X, Y - Yhat, w=w)
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w/np.sum(w) * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/np.sum(w_unlabeled) * N
+    use_unlabeled = lhat != 0
+
+    imputed_theta = _wls(X_unlabeled, Yhat_unlabeled, w=w_unlabeled) if lhat is None else _wls(X_unlabeled, lhat*Yhat_unlabeled, w=w_unlabeled)
+    rectifier = _wls(X, Y - Yhat, w=w) if lhat is None else _wls(X, Y - lhat*Yhat, w=w)
     theta_pp = imputed_theta + rectifier
-    return theta_pp
+    
+    if lhat is None:
+        grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(theta_pp, X.astype(float), Y, Yhat, X_unlabeled.astype(float), Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled, use_unlabeled=use_unlabeled)
+        lhat_opt =  _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord)
+        return ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=lhat_opt, coord=coord, w=w, w_unlabeled=w_unlabeled)
+    else:
+        return theta_pp
 
-
-def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided', lhat=None, coord=None):
+def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='two-sided', lhat=None, coord=None, w=None, w_unlabeled=None):
     """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
 
     Args:
@@ -372,6 +452,8 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
         lhat (float): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
         coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
@@ -379,31 +461,14 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+    use_unlabeled = lhat!=0 # If lhat is 0, revert to classical estimation.
 
-    if lhat is None:
-        ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled)
-    else:
-        ppi_pointest = ppi_ols_pointestimate(X, Y, lhat*Yhat, X_unlabeled, lhat*Yhat_unlabeled)
-
-    hessian = np.zeros((d,d))
-    grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
-    if lhat != 0:
-        for i in range(N):
-            hessian += 1/(N+n) * np.outer(X_unlabeled[i], X_unlabeled[i])
-            grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(np.dot(X_unlabeled[i,:], ppi_pointest) - Yhat_unlabeled[i])
-
-    grads = np.zeros(X.shape)
-    grads_hat = np.zeros(X.shape)
-    for i in range(n):
-        hessian += 1/(N+n) * np.outer(X[i], X[i]) if lhat != 0 else 1/n * np.outer(X[i], X[i])
-        grads[i,:] = X[i,:]*(np.dot(X[i,:], ppi_pointest) - Y[i])
-        grads_hat[i,:] = X[i,:]*(np.dot(X[i,:], ppi_pointest) - Yhat[i])
-
-    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
+    ppi_pointest = ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(ppi_pointest, X.astype(float), Y, Yhat, X_unlabeled.astype(float), Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled, use_unlabeled=use_unlabeled)
 
     if lhat is None:
         lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord)
-        return ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord)
+        return ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
 
     var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
@@ -419,46 +484,7 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='
 
 """
 
-def ppi_logistic_pointestimate(
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled, step_size=1e-3, grad_tol=5e-16
-):
-    """Computes the prediction-powered point estimate of the logistic regression coefficients.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-
-    Returns:
-        theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
-    """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-    rectifier = 1 / n * X.T @ (Yhat - Y)
-    theta = (
-        LogisticRegression(
-            penalty=None,
-            solver="lbfgs",
-            max_iter=10000,
-            tol=1e-15,
-            fit_intercept=False,
-        )
-        .fit(X, Y)
-        .coef_.squeeze()
-    )
-    if len(theta.shape) == 0:
-        theta = theta.reshape(1)
-    mu_theta = expit(X_unlabeled @ theta)
-    grad = grad_tol * np.ones(d) + 1  # Initialize to enter while loop
-    while np.linalg.norm(grad) > grad_tol:
-        mu_theta = expit(X_unlabeled @ theta)
-        grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled) + rectifier
-        theta -= step_size * grad
-    return theta
-
+@njit
 def safe_expit(x):
     """Computes the sigmoid function in a numerically stable way."""
     return np.exp(-np.logaddexp(0, -x))
@@ -473,8 +499,8 @@ def safe_log1pexp(x):
     out[~idxs] = np.log1p(np.exp(x[~idxs]))
     return out
 
-def ppi_logistic_pointestimate_tuned(
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled, optimizer_options=None, lhat=None
+def ppi_logistic_pointestimate(
+    X, Y, Yhat, X_unlabeled, Yhat_unlabeled, optimizer_options=None, lhat=None, coord=None, w=None, w_unlabeled=None
 ):
     """Computes the prediction-powered point estimate of the logistic regression coefficients.
 
@@ -486,6 +512,9 @@ def ppi_logistic_pointestimate_tuned(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         lhat (float): Tuning parameter for how much to factor in the model predictions. Defaults to the standard prediction-powered point-estimate.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray): Sample weights for the labeled data set.
+        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
@@ -493,10 +522,11 @@ def ppi_logistic_pointestimate_tuned(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w/w.sum()*n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum()*N
     if optimizer_options is None:
-        optimizer_options = {}
-        optimizer_options['ftol'] = 1e-15
-    lhat = 1 if lhat is None else lhat
+        optimizer_options = {'ftol': 1e-15}
+
     # Initialize theta
     theta = (
         LogisticRegression(
@@ -512,19 +542,26 @@ def ppi_logistic_pointestimate_tuned(
     if len(theta.shape) == 0:
         theta = theta.reshape(1)
 
+    lhat_curr = 1 if lhat is None else lhat
+
     def rectified_logistic_loss(_theta):
-        return lhat/N * np.sum( -Yhat_unlabeled * (X_unlabeled@_theta) + safe_log1pexp(X_unlabeled@_theta) )  - \
-                lhat/n * np.sum( -Yhat * (X@_theta) + safe_log1pexp(X@_theta) ) + \
-                1/n * np.sum( -Y * (X@_theta) + safe_log1pexp(X@_theta) )
+        return lhat_curr/N * np.sum( w_unlabeled*(-Yhat_unlabeled * (X_unlabeled@_theta) + safe_log1pexp(X_unlabeled@_theta)) )  - \
+                lhat_curr/n * np.sum( w*(-Yhat * (X@_theta) + safe_log1pexp(X@_theta)) ) + \
+                1/n * np.sum( w*(-Y * (X@_theta) + safe_log1pexp(X@_theta)) )
 
     def rectified_logistic_grad(_theta):
-        return lhat/N * X_unlabeled.T @ (safe_expit(X_unlabeled@_theta) - Yhat_unlabeled) - \
-                lhat/n * X.T @ (safe_expit(X@_theta) - Yhat) + \
-                1/n * X.T @ (safe_expit(X@_theta) - Y)
+        return lhat_curr/N * X_unlabeled.T @ (w_unlabeled*(safe_expit(X_unlabeled@_theta) - Yhat_unlabeled)) - \
+                lhat_curr/n * X.T @ (w*(safe_expit(X@_theta) - Yhat)) + \
+                1/n * X.T @ (w*(safe_expit(X@_theta) - Y))
 
-    theta = minimize(rectified_logistic_loss, theta, jac=rectified_logistic_grad, method='L-BFGS-B', tol=optimizer_options['ftol'], options=optimizer_options).x
+    ppi_pointest = minimize(rectified_logistic_loss, theta, jac=rectified_logistic_grad, method='L-BFGS-B', tol=optimizer_options['ftol'], options=optimizer_options).x
 
-    return theta
+    if lhat is None:
+        grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(ppi_pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, w_unlabeled)
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian)
+        return ppi_logistic_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, optimizer_options=optimizer_options, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
+    else:
+        return ppi_pointest
 
 def edges_true(arr):
     for axis in range(arr.ndim):
@@ -552,7 +589,7 @@ def expand_contiguous_trues(grid):
 
     return grid
 
-def ppi_logistic_ci(
+def deprecated_ppi_logistic_ci(
     X,
     Y,
     Yhat,
@@ -569,6 +606,8 @@ def ppi_logistic_ci(
     """Computes the prediction-powered confidence interval for the logistic regression coefficients.
 
     This function uses a method of successive refinement, searching over a grid of possible coeffiicents. The grid is centered at the prediction-powered point estimate. The grid is refined until the endpoints of the confidence interval are within the grid radius of the maximum likelihood estimate.
+
+    This method is deprecated in favor of the more efficient `ppi_logistic_ci`. This method is retained for comparison purposes and should not be used in production.
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -591,7 +630,7 @@ def ppi_logistic_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
-    ppi_pointest = ppi_logistic_pointestimate_tuned(
+    ppi_pointest = ppi_logistic_pointestimate(
         X,
         Y,
         Yhat,
@@ -646,16 +685,66 @@ def ppi_logistic_ci(
         confset = np.stack([ppi_pointest - discretization_width, ppi_pointest + discretization_width], axis=0)
     return confset.min(axis=0), confset.max(axis=0)
 
+@njit
+def _logistic_get_stats(pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w=None, w_unlabeled=None, use_unlabeled=True):
+    """Computes the statistics needed for the logistic regression confidence interval.
 
-def eff_ppi_logistic_ci(
+    Args:
+        pointest (ndarray): Point estimate of the logistic regression coefficients.
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        w (ndarray): Standard errors of the gold-standard labels.
+        w_unlabeled (ndarray): Standard errors of the unlabeled data.
+        use_unlabeled (bool): Whether to use the unlabeled data.
+
+    Returns:
+        grads (ndarray): Gradient of the loss function on the labeled data.
+        grads_hat (ndarray): Gradient of the loss function on the labeled predictions.
+        grads_hat_unlabeled (ndarray): Gradient of the loss function on the unlabeled predictions.
+        inv_hessian (ndarray): Inverse Hessian of the loss function on the unlabeled data.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w/w.sum()*n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum()*N
+    
+    mu = safe_expit(X@pointest)
+    mu_til = safe_expit(X_unlabeled@pointest)
+
+    hessian = np.zeros((d,d))
+    grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
+    if use_unlabeled:
+        for i in range(N):
+            hessian += w_unlabeled[i]/(N + n) * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
+            grads_hat_unlabeled[i,:] = w_unlabeled[i]*X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
+
+    grads = np.zeros(X.shape)
+    grads_hat = np.zeros(X.shape)
+    for i in range(n):
+        hessian += w[i]/(N + n) * mu[i] * (1-mu[i]) * np.outer(X[i], X[i]) if use_unlabeled else w[i]/n * mu[i] * (1-mu[i]) * np.outer(X[i], X[i])
+        grads[i,:] = w[i]*X[i,:]*(mu[i] - Y[i])
+        grads_hat[i,:] = w[i]*X[i,:]*(mu[i] - Yhat[i])
+
+    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
+    return grads, grads_hat, grads_hat_unlabeled, inv_hessian
+
+def ppi_logistic_ci(
     X,
     Y,
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
     alpha=0.1,
+    alternative='two-sided',
+    lhat=None,
+    coord=None,
     optimizer_options=None,
-    alternative='two-sided'
+    w=None,
+    w_unlabeled=None
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
 
@@ -668,9 +757,12 @@ def eff_ppi_logistic_ci(
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        step_size (float): Step size to use in the optimizer.
-        grad_tol (float): Gradient tolerance to use in the optimizer.
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray): Weights for the labeled data. If None, it is set to 1.
+        w_unlabeled (ndarray): Weights for the unlabeled data. If None, it is set to 1.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
@@ -678,31 +770,31 @@ def eff_ppi_logistic_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w/w.sum()*n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled/w_unlabeled.sum()*N
+    use_unlabeled = lhat != 0
 
-    ppi_pointest = ppi_logistic_pointestimate_tuned(
+    ppi_pointest = ppi_logistic_pointestimate(
         X,
         Y,
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        optimizer_options=optimizer_options
+        optimizer_options=optimizer_options,
+        lhat=lhat,
+        coord=coord,
+        w=w,
+        w_unlabeled=w_unlabeled
     )
 
-    mu_til = expit(X_unlabeled@ppi_pointest)
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(ppi_pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, w_unlabeled, use_unlabeled=use_unlabeled)
+    if lhat is None:
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian)
+        return ppi_logistic_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, optimizer_options=optimizer_options, alternative=alternative, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
 
-    hessian = np.zeros((d,d))
-    grads_hat = np.zeros(X_unlabeled.shape)
-    for i in range(N):
-        hessian += 1/N * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i])
-        grads_hat[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
+    var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
 
-    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
-
-    var_unlabeled = np.cov(grads_hat.T).reshape(d,d)
-
-    pred_error = Yhat - Y
-    grad_diff = np.diag(pred_error) @ X
-    var = np.cov(grad_diff.T).reshape(d,d)
+    var = np.cov(grads.T - lhat*grads_hat.T).reshape(d,d)
 
     Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
 
@@ -723,88 +815,17 @@ def _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=Non
     else:
         vhat = inv_hessian @ np.eye(d)[coord]
 
-    num = np.trace(vhat @ cov_grads @ vhat) if coord is None else vhat @ cov_grads @ vhat
-    denom = 2*(1+(n/N)) * np.trace(vhat @ var_grads_hat @ vhat) if coord is None else 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
+    if d > 1:
+        num = np.trace(vhat @ cov_grads @ vhat) if coord is None else vhat @ cov_grads @ vhat
+        denom = 2*(1+(n/N)) * np.trace(vhat @ var_grads_hat @ vhat) if coord is None else 2*(1+(n/N)) * vhat @ var_grads_hat @ vhat
+    else:
+        num = vhat * cov_grads * vhat
+        denom = 2*(1+(n/N)) * vhat * var_grads_hat * vhat
 
     lhat = num/denom
 
     lhat = np.clip(num/denom, 0, 1)
-    return lhat
-
-def eff_ppi_logistic_ci_tuned(
-    X,
-    Y,
-    Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
-    alpha=0.1,
-    alternative='two-sided',
-    lhat=None,
-    coord=None,
-    optimizer_options=None
-):
-    """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
-
-    There is no successive refinement in this method, which makes it more efficient than the standard method.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
-    """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-
-    ppi_pointest = ppi_logistic_pointestimate_tuned(
-        X,
-        Y,
-        Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
-        optimizer_options=optimizer_options,
-        lhat=lhat,
-    )
-
-    mu = expit(X@ppi_pointest)
-    mu_til = expit(X_unlabeled@ppi_pointest)
-
-    hessian = np.zeros((d,d))
-    grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
-    for i in range(N):
-        hessian += 1/(N + n) * mu_til[i] * (1-mu_til[i]) * np.outer(X_unlabeled[i], X_unlabeled[i]) if lhat != 0 else 0
-        grads_hat_unlabeled[i,:] = X_unlabeled[i,:]*(mu_til[i] - Yhat_unlabeled[i])
-
-    grads = np.zeros(X.shape)
-    grads_hat = np.zeros(X.shape)
-    for i in range(n):
-        hessian += 1/(N + n) * mu[i] * (1-mu[i]) * np.outer(X[i], X[i]) if lhat != 0 else 1/n * mu[i] * (1-mu[i]) * np.outer(X[i], X[i])
-        grads[i,:] = X[i,:]*(mu[i] - Y[i])
-        grads_hat[i,:] = X[i,:]*(mu[i] - Yhat[i])
-
-    inv_hessian = np.linalg.inv(hessian).reshape(d,d)
-
-    if lhat is None:
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian)
-        return eff_ppi_logistic_ci_tuned(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, optimizer_options=optimizer_options, alternative=alternative, lhat=lhat, coord=coord)
-
-    var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
-
-    var = np.cov(grads.T - lhat*grads_hat.T).reshape(d,d)
-
-    Sigma_hat = inv_hessian @ (n/N * var_unlabeled + var) @ inv_hessian
-
-    return _zconfint_generic(ppi_pointest, np.sqrt(np.diag(Sigma_hat)/n), alpha=alpha, alternative=alternative)
+    return lhat.item()
 
 """
     DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT ʕ·ᴥ·ʔ

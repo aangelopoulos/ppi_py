@@ -274,7 +274,7 @@ def logistic(X, Y):
         np.ndarray: Logistic regression coefficients.
     """
     regression = LogisticRegression(
-        penalty="none",
+        penalty=None,
         solver="lbfgs",
         max_iter=10000,
         tol=1e-15,
