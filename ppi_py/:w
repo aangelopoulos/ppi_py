@@ -73,19 +73,19 @@ def ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=Non
     N = Yhat_unlabeled.shape[0]
     d = Yhat.shape[1] if len(Yhat.shape) > 1 else 1
     w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+    w_unlabeled = np.ones(Yhat_unlabeled.shape[0]) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
     if lhat is None:
         ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean()
         grads = w * (Y - ppi_pointest)
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=(not one_step))
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=~one_step)
         if one_step:
             return ppi_pointest - inv_hessian@(lhat*grads_hat_unlabeled.mean(axis=0) + grads.mean(axis=0) - lhat*grads_hat.mean(axis=0))
         return ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled, one_step=one_step)
     else:
-        return (w_unlabeled * lhat*Yhat_unlabeled).mean(axis=0) + (w * (Y-lhat*Yhat)).mean(axis=0)
+        return (w_unlabeled * Yhat_unlabeled).mean() + (w * (Y-Yhat)).mean()
 
 def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lhat=None, coord=None, w=None, w_unlabeled=None, one_step=False):
     """Computes the prediction-powered confidence interval for the mean.
@@ -117,7 +117,7 @@ def ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, alternative="two-sided", lha
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=(not one_step))
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=~one_step)
         return ppi_mean_ci(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled, one_step=one_step)
 
     ppi_pointest = ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled, one_step=one_step)
@@ -165,8 +165,8 @@ def ppi_mean_pval(Y, Yhat, Yhat_unlabeled, null=0, alternative="two-sided", lhat
     return _rectified_p_value(
         (w*Y - lhat*w*Yhat).mean(),
         (w*Y - lhat*w*Yhat).std() / np.sqrt(n),
-        (w_unlabeled*lhat*Yhat_unlabeled).mean(),
-        (w_unlabeled*lhat*Yhat_unlabeled).std() / np.sqrt(N),
+        (w_unlabeled*Yhat_unlabeled).mean(),
+        (w_unlabeled*Yhat_unlabeled).std() / np.sqrt(N),
         null,
         alternative,
     )
@@ -437,11 +437,11 @@ def ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=None, co
 
     if lhat is None:
         grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(theta_pp, X.astype(float), Y, Yhat, X_unlabeled.astype(float), Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled, use_unlabeled=use_unlabeled)
-        lhat =  _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip=(not one_step))
+        lhat_opt =  _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip=~one_step)
         if one_step:
-            return theta_pp - inv_hessian@(lhat*grads_hat_unlabeled.mean(axis=0) + grads.mean(axis=0) - lhat*grads_hat.mean(axis=0))
+            return theta_pp - inv_hessian@(lhat_opt*grads_hat_unlabeled.mean(axis=0) + grads.mean(axis=0) - lhat_opt*grads_hat.mean(axis=0))
         else:
-            return ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
+            return ppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lhat=lhat_opt, coord=coord, w=w, w_unlabeled=w_unlabeled)
     else:
         return theta_pp
 
@@ -474,7 +474,7 @@ def ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=0.1, alternative='
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(ppi_pointest, X.astype(float), Y, Yhat, X_unlabeled.astype(float), Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled, use_unlabeled=use_unlabeled)
 
     if lhat is None:
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip=(not one_step))
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip=~one_step)
         return ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, alpha=alpha, alternative=alternative, lhat=lhat, coord=coord, w=w, w_unlabeled=w_unlabeled)
 
     var_unlabeled = np.cov(lhat*grads_hat_unlabeled.T).reshape(d,d)
@@ -566,7 +566,7 @@ def ppi_logistic_pointestimate(
 
     if lhat is None:
         grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(ppi_pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, w_unlabeled)
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, clip=(not one_step))
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, clip=~one_step)
         if one_step:
             return ppi_pointest - inv_hessian@(lhat*grads_hat_unlabeled.mean(axis=0) + grads.mean(axis=0) - lhat*grads_hat.mean(axis=0))
         else:
@@ -802,7 +802,7 @@ def ppi_logistic_ci(
 
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(ppi_pointest, X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w, w_unlabeled, use_unlabeled=use_unlabeled)
     if lhat is None:
-        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, clip=(not one_step))
+        lhat = _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, clip=~one_step)
         if one_step:
             onestep_ppi_pointest = ppi_logistic_pointestimate(
                 X,
@@ -859,8 +859,8 @@ def _calc_lhat_glm(grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=Non
         denom = 2*(1+(n/N)) * vhat * var_grads_hat * vhat
 
     lhat = num/denom
-    if clip:
-        lhat = np.clip(lhat, 0, 1)
+
+    lhat = np.clip(num/denom, 0, 1)
     return lhat.item()
 
 """
