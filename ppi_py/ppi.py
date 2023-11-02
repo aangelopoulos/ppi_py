@@ -52,13 +52,7 @@ def _rectified_p_value(
 
 
 def ppi_mean_pointestimate(
-    Y,
-    Yhat,
-    Yhat_unlabeled,
-    lhat=None,
-    coord=None,
-    w=None,
-    w_unlabeled=None
+    Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None
 ):
     """Computes the prediction-powered point estimate of the mean.
 
@@ -925,6 +919,7 @@ def ppi_logistic_pointestimate(
         )
     else:
         return ppi_pointest
+
 
 @njit
 def _logistic_get_stats(
