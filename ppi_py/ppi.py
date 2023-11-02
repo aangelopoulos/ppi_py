@@ -12,6 +12,7 @@ from .utils import (
     linfty_binom,
     form_discrete_distribution,
 )
+import pdb
 
 
 def _rectified_p_value(
@@ -223,6 +224,7 @@ def ppi_mean_pval(
     null=0,
     alternative="two-sided",
     lhat=None,
+    coord=None,
     w=None,
     w_unlabeled=None,
 ):
@@ -235,6 +237,7 @@ def ppi_mean_pval(
         null (float): Value of the null hypothesis to be tested.
         alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
         lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray): Sample weights for the labeled data set.
         w_unlabeled (ndarray): Sample weights for the unlabeled data set.
 
@@ -263,15 +266,6 @@ def ppi_mean_pval(
             inv_hessian = np.ones((1, 1))
             lhat = _calc_lhat_glm(
                 grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None
-            )
-            return ppi_mean_ci(
-                Y,
-                Yhat,
-                Yhat_unlabeled,
-                lhat=lhat,
-                coord=coord,
-                w=w,
-                w_unlabeled=w_unlabeled,
             )
 
     return _rectified_p_value(
@@ -302,7 +296,10 @@ def _compute_cdf(Y, grid, w=None):
         tuple: Empirical CDF and its standard deviation at the specified grid points.
     """
     w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
-    indicators = w * (Y[:, None] <= grid[None, :]).astype(float)
+    if w is None:
+        indicators = (Y[:, None] <= grid[None, :]).astype(float)
+    else:
+        indicators = ((Y[:, None] <= grid[None, :]) * w[:,None]).astype(float)
     return indicators.mean(axis=0), indicators.std(axis=0)
 
 
@@ -321,9 +318,14 @@ def _compute_cdf_diff(Y, Yhat, grid, w=None):
     w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
     indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
     indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
-    return (w * (indicators_Y - indicators_Yhat)).mean(axis=0), (
-        w * (indicators_Y - indicators_Yhat)
-    ).std(axis=0)
+    if w is None:
+        return (indicators_Y - indicators_Yhat).mean(axis=0), (
+            indicators_Y - indicators_Yhat
+        ).std(axis=0)
+    else:
+        return (w[:,None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
+             w[:,None] * (indicators_Y - indicators_Yhat)
+        ).std(axis=0)
 
 
 def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):

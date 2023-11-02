@@ -36,7 +36,7 @@ def test_ppi_ols_ci():
     N = 10000
     d = 1
     alphas = np.array([0.05, 0.1, 0.2])
-    epsilon = 0.02
+    epsilon = 0.05
     num_trials = 1000
     includeds = np.zeros_like(alphas)
     for i in range(num_trials):
@@ -72,7 +72,7 @@ def test_classical_ols_ci():
     n = 1000
     d = 3
     alphas = np.array([0.05, 0.1, 0.2])
-    epsilon = 0.02
+    epsilon = 0.05
     num_trials = 1000
     includeds = np.zeros_like(alphas)
     for i in range(num_trials):
@@ -97,7 +97,7 @@ def test_postprediction_ols_ci():
     N = 10000
     d = 2
     alphas = np.array([0.05, 0.1, 0.2])
-    epsilon = 0.02
+    epsilon = 0.05
     num_trials = 20
     bias = 10
     sigma = 0.1

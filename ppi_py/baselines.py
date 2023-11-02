@@ -191,6 +191,7 @@ def classical_ols_ci(X, Y, w=None, alpha=0.1, alternative="two-sided"):
     if w is None:
         pointest, se = _ols(X, Y, return_se=True)
     else:
+        w = w / w.sum() * Y.shape[0]
         pointest, se = _wls(X, Y, w, return_se=True)
     return _zconfint_generic(pointest, se, alpha, alternative)
 

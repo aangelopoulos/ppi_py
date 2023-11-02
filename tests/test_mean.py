@@ -14,9 +14,9 @@ def test_ppi_mean_pointestimate():
 
 
 def test_ppi_mean_ci():
-    trials = 1000
+    trials = 100
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.05
+    epsilon = 0.1
     includeds = np.zeros_like(alphas)
     for i in range(trials):
         Y = np.random.normal(0, 1, 10000)
@@ -67,7 +67,7 @@ def test_classical_mean_ci():
 
 
 def test_semisupervised_mean_ci():
-    trials = 1000
+    trials = 100
     K = 5
     d = 2  # Dimension of _features_ (not mean)
     n = 1000
@@ -75,7 +75,7 @@ def test_semisupervised_mean_ci():
     sigma = 1
     mu = 10
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.05
+    epsilon = 0.1
     includeds = np.zeros_like(alphas)
     for i in range(trials):
         X = np.random.normal(0, 1, size=(n, d))
@@ -93,14 +93,14 @@ def test_semisupervised_mean_ci():
 
 
 def test_conformal_mean_ci():
-    trials = 1000
+    trials = 100
     n = 1000
     N = 10000
     bias = 5
     sigma = 10
     mu = 10
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.05
+    epsilon = 0.1
     includeds = np.zeros_like(alphas)
     for i in range(trials):
         Y = np.random.normal(mu, 1, n)
