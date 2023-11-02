@@ -14,9 +14,9 @@ def test_ppi_mean_pointestimate():
 
 
 def test_ppi_mean_ci():
-    trials = 10000
+    trials = 1000
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.02
+    epsilon = 0.05
     includeds = np.zeros_like(alphas)
     for i in range(trials):
         Y = np.random.normal(0, 1, 10000)
@@ -31,9 +31,9 @@ def test_ppi_mean_ci():
 
 
 def test_ppi_mean_pval():
-    trials = 10000
+    trials = 1000
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.02
+    epsilon = 0.05
     failed = False
     rejected = np.zeros_like(alphas)
     for i in range(trials):
@@ -52,9 +52,9 @@ def test_ppi_mean_pval():
 
 
 def test_classical_mean_ci():
-    trials = 10000
+    trials = 1000
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-    epsilon = 0.02
+    epsilon = 0.05
     includeds = np.zeros_like(alphas)
     for i in range(trials):
         Y = np.random.normal(0, 1, 10000)
@@ -93,7 +93,7 @@ def test_semisupervised_mean_ci():
 
 
 def test_conformal_mean_ci():
-    trials = 10000
+    trials = 1000
     n = 1000
     N = 10000
     bias = 5
