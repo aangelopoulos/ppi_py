@@ -49,7 +49,7 @@ The expected results look as below :math:`^*`:
 
 .. code-block::
 
-   theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
+   theta=0.259, CPP=(0.2322466630315982, 0.2626038799812829)
 
 (:math:`^*` these results were produced with ``numpy=1.26.0``\ , and may differ slightly due to randomness in other environments.)
 

@@ -62,9 +62,9 @@ print(f"theta={Y_total.mean():.3f}, CPP={ppi_ci}")
 
 The expected results look as below $^*$: 
 ```
-theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
+theta=0.259, CPP=(0.2322466630315982, 0.2626038799812829)
 ```
-($^*$ these results were produced with ```numpy=1.26.0```, and may differ slightly due to randomness in other environments.)
+($^*$ these results were produced with ```numpy=1.26.1```, and may differ slightly due to randomness in other environments.)
 
 If you have reached this stage, congratulations! You have constructed a prediction-powered confidence interval.
 See [the documentation](https://ppi-py.readthedocs.io/en/latest/) for more usages of prediction-powered inference.
@@ -134,4 +134,5 @@ Accepted pull requests will be run through an automated [Black](https://black.re
 The repository currently implements the methods developed in the following papers:
 
 [Prediction-Powered Inference](https://arxiv.org/abs/2301.09633)
+
 [PPI++: Efficient Prediction-Powered Inference](https://arxiv.org/abs/2301.09633)

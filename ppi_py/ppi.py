@@ -30,8 +30,8 @@ def _rectified_p_value(
         rectifier_std (float or ndarray): Rectifier standard deviation.
         imputed_mean (float or ndarray): Imputed mean.
         imputed_std (float or ndarray): Imputed standard deviation.
-        null (float): Value of the null hypothesis to be tested.
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        null (float, optional): Value of the null hypothesis to be tested. Defaults to 0.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
 
     Returns:
         float or ndarray: P-value.
@@ -67,14 +67,17 @@ def ppi_mean_pointestimate(
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set. Defaults to all ones vector.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set. Defaults to all ones vector.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the original PPI point estimate. If `lhat=0`, recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         float or ndarray: Prediction-powered point estimate of the mean.
+
+    Notes:
+        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -141,16 +144,19 @@ def ppi_mean_ci(
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
+
+    Notes:
+        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -235,14 +241,17 @@ def ppi_mean_pval(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         null (float): Value of the null hypothesis to be tested.
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate. Uses the algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         float or ndarray: Prediction-powered p-value for the mean.
+
+    Notes:
+        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -290,7 +299,7 @@ def _compute_cdf(Y, grid, w=None):
     Args:
         Y (ndarray): Data.
         grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray): Sample weights.
+        w (ndarray, optional): Sample weights.
 
     Returns:
         tuple: Empirical CDF and its standard deviation at the specified grid points.
@@ -310,7 +319,7 @@ def _compute_cdf_diff(Y, Yhat, grid, w=None):
         Y (ndarray): Data.
         Yhat (ndarray): Predictions.
         grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray): Sample weights.
+        w (ndarray, optional): Sample weights.
 
     Returns:
         tuple: Difference between the empirical CDFs of the data and the predictions and its standard deviation at the specified grid points.
@@ -336,8 +345,8 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         ndarray: Rectified CDF of the data at the specified grid points.
@@ -363,9 +372,9 @@ def ppi_quantile_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         q (float): Quantile to estimate.
-        exact_grid (bool): Whether to compute the exact solution (True) or an approximate solution based on a linearly spaced grid of 5000 values (False).
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
+        exact_grid (bool, optional): Whether to compute the exact solution (True) or an approximate solution based on a linearly spaced grid of 5000 values (False).
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         float: Prediction-powered point estimate of the quantile.
@@ -413,10 +422,10 @@ def ppi_quantile_ci(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         q (float): Quantile to estimate. Must be in the range (0, 1).
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        exact_grid (bool): Whether to use the exact grid of values or a linearly spaced grid of 5000 values.
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        exact_grid (bool, optional): Whether to use the exact grid of values or a linearly spaced grid of 5000 values.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the quantile.
@@ -464,7 +473,7 @@ def _ols(X, Y, return_se=False):
     Args:
         X (ndarray): Covariates.
         Y (ndarray): Labels.
-        return_se (bool): Whether to return the standard errors of the coefficients.
+        return_se (bool, optional): Whether to return the standard errors of the coefficients.
 
     Returns:
         theta (ndarray): Ordinary least squares estimate of the coefficients.
@@ -484,8 +493,8 @@ def _wls(X, Y, w=None, return_se=False):
     Args:
         X (ndarray): Covariates.
         Y (ndarray): Labels.
-        w (ndarray): Sample weights.
-        return_se (bool): Whether to return the standard errors.
+        w (ndarray, optional): Sample weights.
+        return_se (bool, optional): Whether to return the standard errors.
 
     Returns:
         theta (ndarray): Weighted least squares estimate of the coefficients.
@@ -523,9 +532,9 @@ def _ols_get_stats(
         Yhat (ndarray): Predictions for the labeled data set.
         X_unlabeled (ndarray): Covariates for the unlabeled data set.
         Yhat_unlabeled (ndarray): Predictions for the unlabeled data set.
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
-        use_unlabeled (bool): Whether to use the unlabeled data set.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        use_unlabeled (bool, optional): Whether to use the unlabeled data set.
 
     Returns:
         grads (ndarray): Gradient of the loss function with respect to the coefficients.
@@ -595,14 +604,17 @@ def ppi_ols_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        lhat (float, optional): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
+
+    Notes:
+        The power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -691,16 +703,19 @@ def ppi_ols_ci(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float, optional): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
+
+    Notes:
+        This version of the OLS confidence interval and the power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -818,15 +833,18 @@ def ppi_logistic_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-        lhat (float): Tuning parameter for how much to factor in the model predictions. Defaults to the standard prediction-powered point-estimate.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        w (ndarray): Sample weights for the labeled data set.
-        w_unlabeled (ndarray): Sample weights for the unlabeled data set.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        lhat (float, optional): Tuning parameter for how much to factor in the model predictions. Defaults to the standard prediction-powered point-estimate.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -1003,14 +1021,14 @@ def deprecated_ppi_logistic_ci(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        grid_size (int): Number of grid points to initially use in the grid search.
-        grid_limit (float): Maximum absolute number of grid points.
-        max_refinements (int): Maximum number of refinements to use in the grid search.
-        grid_radius (float): Initial radius of the grid search.
-        grid_relative (bool): Whether to use a relative grid search --- i.e., whether the radius is in units scaled according to the point estimate.
-        step_size (float): Step size to use in the optimizer.
-        grad_tol (float): Gradient tolerance to use in the optimizer.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        grid_size (int, optional): Number of grid points to initially use in the grid search.
+        grid_limit (float, optional): Maximum absolute number of grid points.
+        max_refinements (int, optional): Maximum number of refinements to use in the grid search.
+        grid_radius (float, optional): Initial radius of the grid search.
+        grid_relative (bool, optional): Whether to use a relative grid search --- i.e., whether the radius is in units scaled according to the point estimate.
+        step_size (float, optional): Step size to use in the optimizer.
+        grad_tol (float, optional): Gradient tolerance to use in the optimizer.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
@@ -1113,9 +1131,9 @@ def _logistic_get_stats(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        w (ndarray): Standard errors of the gold-standard labels.
-        w_unlabeled (ndarray): Standard errors of the unlabeled data.
-        use_unlabeled (bool): Whether to use the unlabeled data.
+        w (ndarray, optional): Standard errors of the gold-standard labels.
+        w_unlabeled (ndarray, optional): Standard errors of the unlabeled data.
+        use_unlabeled (bool, optional): Whether to use the unlabeled data.
 
     Returns:
         grads (ndarray): Gradient of the loss function on the labeled data.
@@ -1193,17 +1211,20 @@ def ppi_logistic_ci(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        alpha (float): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        alternative (str): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        optimizer_options (dict): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-        w (ndarray): Weights for the labeled data. If None, it is set to 1.
-        w_unlabeled (ndarray): Weights for the unlabeled data. If None, it is set to 1.
-        one_step (bool): Whether to use the one-step estimation strategy. Defaults to False.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lhat (float, optional): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+        w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+
+    Notes:
+        This version of the logistic regression confidence interval and the power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -1318,8 +1339,8 @@ def _calc_lhat_glm(
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
         grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        clip (bool): Whether to clip the value of lhat to be non-negative. Defaults to False.
+        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        clip (bool, optional): Whether to clip the value of lhat to be non-negative. Defaults to False.
 
     Returns:
         float: Optimal value of lhat. Lies in [0,1].
@@ -1371,13 +1392,13 @@ def _calc_lhat_glm(
 
 
 """
-    DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT ʕ·ᴥ·ʔ
+    DISCRETE DISTRIBUTION ESTIMATION UNDER LABEL SHIFT
 
 """
 
 
 def ppi_distribution_label_shift_ci(
-    Y, Yhat, Yhat_unlabeled, K, nu, alpha, delta, return_counts=True
+    Y, Yhat, Yhat_unlabeled, K, nu, alpha=0.1, delta=None, return_counts=True
 ):
     """Computes the prediction-powered confidence interval for nu^T f for a discrete distribution f, under label shift.
 
@@ -1387,15 +1408,17 @@ def ppi_distribution_label_shift_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         K (int): Number of classes.
         nu (ndarray): Vector nu. Coordinates must be bounded within [0, 1].
-        alpha (float): Final error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
-        delta (float): Error level of the intermediate confidence interval for the mean. Must be in (0, 1). If return_counts == False, then delta is set equal to alpha and ignored.
-        return_counts (bool): Whether to return the number of samples in each class as opposed to the mean.
+        alpha (float, optional): Final error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
+        delta (float, optional): Error level of the intermediate confidence interval for the mean. Must be in (0, alpha). If return_counts == False, then delta is set equal to alpha and ignored.
+        return_counts (bool, optional): Whether to return the number of samples in each class as opposed to the mean.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for nu^T f for a discrete distribution f, under label shift.
     """
     if not return_counts:
         delta = alpha
+    if delta is None:
+        delta = alpha * 0.95
     # Construct the confusion matrix
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]

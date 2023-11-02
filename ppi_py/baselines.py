@@ -15,11 +15,12 @@ import pdb
 """
 
 
-def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
+def classical_mean_ci(Y, w=None, alpha=0.1, alternative="two-sided"):
     """Classical mean confidence interval using the central limit theorem.
 
     Args:
         Y (ndarray): Array of observations.
+        w (ndarray, optional): Sample weights for the data set. Must be positive and will be normalized to sum to the size of the dataset.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "larger", or "smaller". Defaults to "two-sided".
 
@@ -27,10 +28,15 @@ def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
         tuple: (lower, upper) confidence interval bounds.
     """
     n = Y.shape[0]
-    return _zconfint_generic(
-        Y.mean(), Y.std() / np.sqrt(n), alpha, alternative
-    )
-
+    if w is None:
+        return _zconfint_generic(
+            Y.mean(), Y.std() / np.sqrt(n), alpha, alternative
+        )
+    else:
+        w = w/w.sum() * n
+        return _zconfint_generic(
+            (w*Y).mean(), (w*Y).std() / np.sqrt(n), alpha, alternative
+        )
 
 def semisupervised_mean_ci(
     X,
@@ -180,7 +186,7 @@ def classical_ols_ci(X, Y, w=None, alpha=0.1, alternative="two-sided"):
     Args:
         X (ndarray): Labeled features.
         Y (ndarray): Labeled responses.
-        w (ndarray): Sample weights for the labeled data set. Must be positive and sum to 1.
+        w (ndarray, optional): Sample weights for the data set. Must be positive and will be normalized to sum to the size of the dataset.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
 
