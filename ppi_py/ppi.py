@@ -1015,12 +1015,6 @@ def deprecated_ppi_logistic_ci(
 
     This method is deprecated in favor of the more efficient `ppi_logistic_ci`. This method is retained for comparison purposes and should not be used in production.
 
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         grid_size (int, optional): Number of grid points to initially use in the grid search.
         grid_limit (float, optional): Maximum absolute number of grid points.
@@ -1036,6 +1030,7 @@ def deprecated_ppi_logistic_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+
     ppi_pointest = ppi_logistic_pointestimate(
         X,
         Y,
