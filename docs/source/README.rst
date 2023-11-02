@@ -49,7 +49,7 @@ The expected results look as below :math:`^*`:
 
 .. code-block::
 
-   theta=0.259, CPP=(0.235677274705698, 0.26595223970754855)
+   theta=0.259, CPP=(0.2322466630315982, 0.2626038799812829)
 
 (:math:`^*` these results were produced with ``numpy=1.26.0``\ , and may differ slightly due to randomness in other environments.)
 
@@ -90,3 +90,12 @@ You can replace ``[ESTIMAND]`` with the estimand of your choice. For certain est
 All the prediction-powered point estimates and confidence intervals implemented so far can be imported by running ``from ppi_py import ppi_[ESTIMAND]_pointestimate, ppi_[ESTIMAND]_ci``. For the case of the mean, one can also import the p-value as ``from ppi import ppi_mean_pval``.
 
 Full API documentation can be found by following the links on the left-hand sidebar of this page.
+
+Papers
+======
+
+The repository currently implements the methods developed in the following papers:
+
+`Prediction-Powered Inference <https://arxiv.org/abs/2106.06487>`_
+
+`PPI++: Efficient Prediction-Powered Inference <https://arxiv.org/abs/2106.06487>`_

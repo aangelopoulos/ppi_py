@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 project = "ppi_py"
 copyright = "2023, Anastasios N. Angelopoulos, Stephen Bates, Clara Fannjiang, Michael I. Jordan, Tijana Zrnic, and others"
 author = "Anastasios N. Angelopoulos, Stephen Bates, Clara Fannjiang, Michael I. Jordan, Tijana Zrnic, and others"
-release = "0.1"
+release = "0.2"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -27,7 +27,14 @@ extensions = [
 
 templates_path = ["_templates"]
 exclude_patterns = []
-autodoc_mock_imports = ["numpy", "scipy", "statsmodels", "sklearn", "pandas"]
+autodoc_mock_imports = [
+    "numpy",
+    "numba",
+    "scipy",
+    "statsmodels",
+    "sklearn",
+    "pandas",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
