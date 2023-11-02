@@ -703,6 +703,12 @@ def ppi_ols_ci(
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
     use_unlabeled = lhat != 0  # If lhat is 0, revert to classical estimation.
 
     ppi_pointest = ppi_ols_pointestimate(

@@ -19,7 +19,7 @@ def classical_mean_ci(Y, alpha=0.1, alternative="two-sided"):
     """Classical mean confidence interval using the central limit theorem.
 
     Args:
-        Y (np.ndarray): Array of observations.
+        Y (ndarray): Array of observations.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "larger", or "smaller". Defaults to "two-sided".
 
@@ -44,9 +44,9 @@ def semisupervised_mean_ci(
     """Semisupervised mean confidence interval from \"High-dimensional semi-supervised learning: in search of optimal inference of the mean\" by Zhang and Bradic (2022).
 
     Args:
-        X (np.ndarray): Labeled covariates.
-        Y (np.ndarray): Labeled responses.
-        X_unlabeled (np.ndarray): Unlabeled covariates.
+        X (ndarray): Labeled covariates.
+        Y (ndarray): Labeled responses.
+        X_unlabeled (ndarray): Unlabeled covariates.
         K (int): Number of folds for cross-fitting.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "larger", or "smaller". Defaults to "two-sided".
@@ -116,9 +116,9 @@ def conformal_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, bonferroni=True):
     In practice, this method is not recommended.
 
     Args:
-        Y (np.ndarray): Labeled responses.
-        Yhat (np.ndarray): Predicted responses for labeled samples.
-        Yhat_unlabeled (np.ndarray): Predicted responses for unlabeled samples.
+        Y (ndarray): Labeled responses.
+        Yhat (ndarray): Predicted responses for labeled samples.
+        Yhat_unlabeled (ndarray): Predicted responses for unlabeled samples.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         bonferroni (bool, optional): Whether to use a Bonferroni correction for simultaneous inference. Defaults to True.
 
@@ -153,7 +153,7 @@ def classical_quantile_ci(Y, q, alpha=0.1):
     """Confidence interval for a quantile using the classical method.
 
     Args:
-        Y (np.ndarray): Labeled responses.
+        Y (ndarray): Labeled responses.
         q (float): Quantile to estimate. Must be in (0, 1).
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
 
@@ -174,12 +174,13 @@ def classical_quantile_ci(Y, q, alpha=0.1):
 """
 
 
-def classical_ols_ci(X, Y, alpha=0.1, alternative="two-sided"):
+def classical_ols_ci(X, Y, w=None, alpha=0.1, alternative="two-sided"):
     """Confidence interval for the OLS coefficients using the classical method.
 
     Args:
-        X (np.ndarray): Labeled features.
-        Y (np.ndarray): Labeled responses.
+        X (ndarray): Labeled features.
+        Y (ndarray): Labeled responses.
+        w (ndarray): Sample weights for the labeled data set. Must be positive and sum to 1.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
 
@@ -187,27 +188,11 @@ def classical_ols_ci(X, Y, alpha=0.1, alternative="two-sided"):
         tuple: (lower, upper) confidence interval bounds.
     """
     n = Y.shape[0]
-    pointest, se = _ols(X, Y, return_se=True)
+    if w is None:
+        pointest, se = _ols(X, Y, return_se=True)
+    else:
+        pointest, se = _wls(X, Y, w, return_se=True)
     return _zconfint_generic(pointest, se, alpha, alternative)
-
-
-def classical_ols_covshift_ci(X, Y, w, alpha=0.1, alternative="two-sided"):
-    """Confidence interval for the OLS coefficients using the classical method with covariate shift.
-
-    Args:
-        X (np.ndarray): Labeled features.
-        Y (np.ndarray): Labeled responses.
-        w (np.ndarray): Weights for labeled samples.
-        alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
-        alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
-
-    Returns:
-        tuple: (lower, upper) confidence interval bounds.
-    """
-    n = Y.shape[0]
-    pointest, se = _wls(X, Y, w, return_se=True)
-    return _zconfint_generic(pointest, se, alpha, alternative)
-
 
 def postprediction_ols_ci(
     Y,
@@ -224,10 +209,10 @@ def postprediction_ols_ci(
     It is included for comparison purposes.
 
     Args:
-        Y (np.ndarray): Labeled responses.
-        Yhat (np.ndarray): Predicted responses for labeled samples.
-        X_unlabeled (np.ndarray): Unlabeled features.
-        Yhat_unlabeled (np.ndarray): Predicted responses for unlabeled samples.
+        Y (ndarray): Labeled responses.
+        Yhat (ndarray): Predicted responses for labeled samples.
+        X_unlabeled (ndarray): Unlabeled features.
+        Yhat_unlabeled (ndarray): Predicted responses for unlabeled samples.
         bootstrap_samples (int, optional): Number of bootstrap samples to use. Defaults to 50.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
@@ -267,11 +252,11 @@ def logistic(X, Y):
     """Compute the logistic regression coefficients.
 
     Args:
-        X (np.ndarray): Labeled features.
-        Y (np.ndarray): Labeled responses.
+        X (ndarray): Labeled features.
+        Y (ndarray): Labeled responses.
 
     Returns:
-        np.ndarray: Logistic regression coefficients.
+        ndarray: Logistic regression coefficients.
     """
     regression = LogisticRegression(
         penalty=None,
@@ -287,8 +272,8 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     """Confidence interval for the logistic regression coefficients using the classical method.
 
     Args:
-        X (np.ndarray): Labeled
-        Y (np.ndarray): Labeled responses.
+        X (ndarray): Labeled
+        Y (ndarray): Labeled responses.
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
 
