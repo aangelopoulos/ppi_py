@@ -58,8 +58,7 @@ def ppi_mean_pointestimate(
     lhat=None,
     coord=None,
     w=None,
-    w_unlabeled=None,
-    one_step=False,
+    w_unlabeled=None
 ):
     """Computes the prediction-powered point estimate of the mean.
 
@@ -71,7 +70,6 @@ def ppi_mean_pointestimate(
         coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         float or ndarray: Prediction-powered point estimate of the mean.
@@ -102,14 +100,8 @@ def ppi_mean_pointestimate(
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
-            clip=(not one_step),
+            clip=True,
         )
-        if one_step:
-            return ppi_pointest - inv_hessian @ (
-                lhat * grads_hat_unlabeled.mean(axis=0)
-                + grads.mean(axis=0)
-                - lhat * grads_hat.mean(axis=0)
-            )
         return ppi_mean_pointestimate(
             Y,
             Yhat,
@@ -118,7 +110,6 @@ def ppi_mean_pointestimate(
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
-            one_step=one_step,
         )
     else:
         return (w_unlabeled * lhat * Yhat_unlabeled).mean(axis=0) + (
@@ -136,7 +127,6 @@ def ppi_mean_ci(
     coord=None,
     w=None,
     w_unlabeled=None,
-    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for the mean.
 
@@ -150,7 +140,6 @@ def ppi_mean_ci(
         coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
@@ -176,7 +165,6 @@ def ppi_mean_ci(
             lhat=1,
             w=w,
             w_unlabeled=w_unlabeled,
-            one_step=False,
         )
         grads = w * (Y - ppi_pointest)
         grads_hat = w * (Yhat - ppi_pointest)
@@ -188,7 +176,7 @@ def ppi_mean_ci(
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
-            clip=(not one_step),
+            clip=True,
         )
         return ppi_mean_ci(
             Y,
@@ -198,7 +186,6 @@ def ppi_mean_ci(
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
-            one_step=one_step,
         )
 
     ppi_pointest = ppi_mean_pointestimate(
@@ -209,7 +196,6 @@ def ppi_mean_ci(
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
-        one_step=one_step,
     )
 
     imputed_std = (w_unlabeled * (lhat * Yhat_unlabeled)).std() / np.sqrt(N)
@@ -594,7 +580,6 @@ def ppi_ols_pointestimate(
     coord=None,
     w=None,
     w_unlabeled=None,
-    one_step=False,
 ):
     """Computes the prediction-powered point estimate of the OLS coefficients.
 
@@ -608,13 +593,12 @@ def ppi_ols_pointestimate(
         coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
 
     Notes:
-        The power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -657,26 +641,19 @@ def ppi_ols_pointestimate(
             grads_hat_unlabeled,
             inv_hessian,
             coord,
-            clip=(not one_step),
+            clip=True,
         )
-        if one_step:
-            return theta_pp - inv_hessian @ (
-                lhat * grads_hat_unlabeled.mean(axis=0)
-                + grads.mean(axis=0)
-                - lhat * grads_hat.mean(axis=0)
-            )
-        else:
-            return ppi_ols_pointestimate(
-                X,
-                Y,
-                Yhat,
-                X_unlabeled,
-                Yhat_unlabeled,
-                lhat=lhat,
-                coord=coord,
-                w=w,
-                w_unlabeled=w_unlabeled,
-            )
+        return ppi_ols_pointestimate(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            lhat=lhat,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+        )
     else:
         return theta_pp
 
@@ -693,7 +670,6 @@ def ppi_ols_ci(
     coord=None,
     w=None,
     w_unlabeled=None,
-    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
 
@@ -709,7 +685,6 @@ def ppi_ols_ci(
         coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
@@ -738,7 +713,6 @@ def ppi_ols_ci(
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
-        one_step=one_step,
     )
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
         ppi_pointest,
@@ -759,7 +733,7 @@ def ppi_ols_ci(
             grads_hat_unlabeled,
             inv_hessian,
             coord,
-            clip=(not one_step),
+            clip=True,
         )
         return ppi_ols_ci(
             X,
@@ -823,7 +797,6 @@ def ppi_logistic_pointestimate(
     coord=None,
     w=None,
     w_unlabeled=None,
-    one_step=False,
 ):
     """Computes the prediction-powered point estimate of the logistic regression coefficients.
 
@@ -838,7 +811,6 @@ def ppi_logistic_pointestimate(
         coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
@@ -937,173 +909,22 @@ def ppi_logistic_pointestimate(
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
-            clip=(not one_step),
+            clip=True,
         )
-        if one_step:
-            return ppi_pointest - inv_hessian @ (
-                lhat * grads_hat_unlabeled.mean(axis=0)
-                + grads.mean(axis=0)
-                - lhat * grads_hat.mean(axis=0)
-            )
-        else:
-            return ppi_logistic_pointestimate(
-                X,
-                Y,
-                Yhat,
-                X_unlabeled,
-                Yhat_unlabeled,
-                optimizer_options=optimizer_options,
-                lhat=lhat,
-                coord=coord,
-                w=w,
-                w_unlabeled=w_unlabeled,
-            )
+        return ppi_logistic_pointestimate(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            optimizer_options=optimizer_options,
+            lhat=lhat,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+        )
     else:
         return ppi_pointest
-
-
-def edges_true(arr):
-    for axis in range(arr.ndim):
-        if arr.take(0, axis=axis).any() or arr.take(-1, axis=axis).any():
-            return True
-    return False
-
-
-def expand_contiguous_trues(grid):
-    # Find the indices of all "True" values
-    indices = np.where(grid)
-
-    # Determine the min and max indices along each dimension
-    min_indices = [np.min(idx) for idx in indices]
-    max_indices = [np.max(idx) for idx in indices]
-
-    # Expand the min and max indices by 1, but ensure they're within the grid bounds
-    min_indices = [max(0, idx - 1) for idx in min_indices]
-    max_indices = [
-        min(grid.shape[i] - 1, idx + 1) for i, idx in enumerate(max_indices)
-    ]
-
-    # Create slices for each dimension
-    slices = [
-        slice(min_idx, max_idx + 1)
-        for min_idx, max_idx in zip(min_indices, max_indices)
-    ]
-
-    # Set the expanded region to "True"
-    grid[tuple(slices)] = True
-
-    return grid
-
-
-def deprecated_ppi_logistic_ci(
-    X,
-    Y,
-    Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
-    alpha=0.1,
-    grid_size=200,
-    grid_limit=800,
-    max_refinements=10,
-    grid_radius=1,
-    grid_relative=False,
-    optimizer_options=None,
-):
-    """Computes the prediction-powered confidence interval for the logistic regression coefficients.
-
-    This function uses a method of successive refinement, searching over a grid of possible coeffiicents. The grid is centered at the prediction-powered point estimate. The grid is refined until the endpoints of the confidence interval are within the grid radius of the maximum likelihood estimate.
-
-    This method is deprecated in favor of the more efficient `ppi_logistic_ci`. This method is retained for comparison purposes and should not be used in production.
-
-        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
-        grid_size (int, optional): Number of grid points to initially use in the grid search.
-        grid_limit (float, optional): Maximum absolute number of grid points.
-        max_refinements (int, optional): Maximum number of refinements to use in the grid search.
-        grid_radius (float, optional): Initial radius of the grid search.
-        grid_relative (bool, optional): Whether to use a relative grid search --- i.e., whether the radius is in units scaled according to the point estimate.
-        step_size (float, optional): Step size to use in the optimizer.
-        grad_tol (float, optional): Gradient tolerance to use in the optimizer.
-
-    Returns:
-        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
-    """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-
-    ppi_pointest = ppi_logistic_pointestimate(
-        X,
-        Y,
-        Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
-        optimizer_options=optimizer_options,
-    )
-    if grid_relative:
-        grid_radius *= ppi_pointest
-    rectifier = 1 / n * X.T @ (Yhat - Y)
-    rectifier_std = np.std(X * (Yhat - Y)[:, None], axis=0)
-    confset = []
-    grid_edge_accepted = True
-    refinements = -1
-    while (len(confset) == 0) or grid_edge_accepted:
-        refinements += 1
-        if (refinements > max_refinements) and (len(confset) != 0):
-            return np.array([-np.infty] * d), np.array([np.infty] * d)
-        elif refinements > max_refinements:
-            break
-        grid_radius *= 2
-        grid_size *= 2  # **d
-        grid_size = min(grid_size, grid_limit)
-        lower_limits = ppi_pointest - grid_radius * np.ones(d)
-        upper_limits = ppi_pointest + grid_radius * np.ones(d)
-        # Construct a meshgrid between lower_limits and upper_limits, each axis having grid_size points
-        theta_grid = np.stack(
-            np.meshgrid(
-                *[
-                    np.linspace(
-                        lower_limits[i],
-                        upper_limits[i],
-                        int(grid_size ** (1 / d)),
-                    )
-                    for i in range(d)
-                ]
-            ),
-            axis=0,
-        )
-        orig_theta_grid_shape = theta_grid.shape
-        theta_grid = theta_grid.reshape(d, -1).T
-
-        mu_theta = expit(X_unlabeled @ theta_grid.T)
-        grad = 1 / N * X_unlabeled.T @ (mu_theta - Yhat_unlabeled[:, None])
-        prederr_std = np.std(
-            X_unlabeled[:, :, None]
-            * (mu_theta - Yhat_unlabeled[:, None])[:, None, :],
-            axis=0,
-        )
-        w = norm.ppf(1 - alpha / (2 * d)) * np.sqrt(
-            rectifier_std[:, None] ** 2 / n + prederr_std**2 / N
-        )
-        accept = np.all(np.abs(grad + rectifier[:, None]) <= w, axis=0)
-        if np.any(accept):
-            accept_grid = expand_contiguous_trues(
-                accept.reshape(*(orig_theta_grid_shape[1:]))
-            )
-            confset = theta_grid[accept_grid.flatten()]
-            grid_edge_accepted = edges_true(accept_grid)
-        else:
-            grid_edge_accepted = False
-    if len(confset) == 0:
-        discretization_width = (2 * grid_radius) / int(grid_size ** (1 / d))
-        confset = np.stack(
-            [
-                ppi_pointest - discretization_width,
-                ppi_pointest + discretization_width,
-            ],
-            axis=0,
-        )
-    return confset.min(axis=0), confset.max(axis=0)
-
 
 @njit
 def _logistic_get_stats(
@@ -1194,7 +1015,6 @@ def ppi_logistic_ci(
     optimizer_options=None,
     w=None,
     w_unlabeled=None,
-    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
 
@@ -1213,7 +1033,6 @@ def ppi_logistic_ci(
         optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
         w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
-        one_step (bool, optional): Whether to use the one-step estimation strategy. Defaults to False.
 
     Returns:
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
@@ -1262,52 +1081,22 @@ def ppi_logistic_ci(
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
-            clip=(not one_step),
+            clip=True,
         )
-        if one_step:
-            onestep_ppi_pointest = ppi_logistic_pointestimate(
-                X,
-                Y,
-                Yhat,
-                X_unlabeled,
-                Yhat_unlabeled,
-                optimizer_options=optimizer_options,
-                lhat=lhat,
-                coord=coord,
-                w=w,
-                w_unlabeled=w_unlabeled,
-                one_step=True,
-            )
-            var_unlabeled = np.cov(lhat * grads_hat_unlabeled.T).reshape(d, d)
-
-            var = np.cov(grads.T - lhat * grads_hat.T).reshape(d, d)
-
-            Sigma_hat = (
-                inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
-            )
-
-            return _zconfint_generic(
-                onestep_ppi_pointest,
-                np.sqrt(np.diag(Sigma_hat) / n),
-                alpha=alpha,
-                alternative=alternative,
-            )
-
-        else:
-            return ppi_logistic_ci(
-                X,
-                Y,
-                Yhat,
-                X_unlabeled,
-                Yhat_unlabeled,
-                alpha=alpha,
-                optimizer_options=optimizer_options,
-                alternative=alternative,
-                lhat=lhat,
-                coord=coord,
-                w=w,
-                w_unlabeled=w_unlabeled,
-            )
+        return ppi_logistic_ci(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            alpha=alpha,
+            optimizer_options=optimizer_options,
+            alternative=alternative,
+            lhat=lhat,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+        )
 
     var_unlabeled = np.cov(lhat * grads_hat_unlabeled.T).reshape(d, d)
 
