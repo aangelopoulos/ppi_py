@@ -33,10 +33,11 @@ def classical_mean_ci(Y, w=None, alpha=0.1, alternative="two-sided"):
             Y.mean(), Y.std() / np.sqrt(n), alpha, alternative
         )
     else:
-        w = w/w.sum() * n
+        w = w / w.sum() * n
         return _zconfint_generic(
-            (w*Y).mean(), (w*Y).std() / np.sqrt(n), alpha, alternative
+            (w * Y).mean(), (w * Y).std() / np.sqrt(n), alpha, alternative
         )
+
 
 def semisupervised_mean_ci(
     X,
@@ -200,6 +201,7 @@ def classical_ols_ci(X, Y, w=None, alpha=0.1, alternative="two-sided"):
         w = w / w.sum() * Y.shape[0]
         pointest, se = _wls(X, Y, w, return_se=True)
     return _zconfint_generic(pointest, se, alpha, alternative)
+
 
 def postprediction_ols_ci(
     Y,

@@ -308,7 +308,7 @@ def _compute_cdf(Y, grid, w=None):
     if w is None:
         indicators = (Y[:, None] <= grid[None, :]).astype(float)
     else:
-        indicators = ((Y[:, None] <= grid[None, :]) * w[:,None]).astype(float)
+        indicators = ((Y[:, None] <= grid[None, :]) * w[:, None]).astype(float)
     return indicators.mean(axis=0), indicators.std(axis=0)
 
 
@@ -332,8 +332,8 @@ def _compute_cdf_diff(Y, Yhat, grid, w=None):
             indicators_Y - indicators_Yhat
         ).std(axis=0)
     else:
-        return (w[:,None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
-             w[:,None] * (indicators_Y - indicators_Yhat)
+        return (w[:, None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
+            w[:, None] * (indicators_Y - indicators_Yhat)
         ).std(axis=0)
 
 
