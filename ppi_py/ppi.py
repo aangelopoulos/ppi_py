@@ -12,10 +12,6 @@ from .utils import (
     linfty_binom,
     form_discrete_distribution,
 )
-import pdb
-from functools import wraps
-from tqdm import tqdm
-import io
 
 
 def _rectified_p_value(
@@ -1306,6 +1302,20 @@ def ppi_logistic_ci(
 def _calc_lhat_glm(
     grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=False
 ):
+    """
+    Calculates the optimal value of lhat for the prediction-powered confidence interval for GLMs.
+
+    Args:
+        grads (ndarray): Gradient of the loss function with respect to the parameter evaluated at the labeled data.
+        grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
+        grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
+        inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
+        coord (int): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        clip (bool): Whether to clip the value of lhat to be non-negative. Defaults to False.
+
+    Returns:
+        float: Optimal value of lhat. Lies in [0,1].
+    """
     n = grads.shape[0]
     N = grads_hat_unlabeled.shape[0]
     d = inv_hessian.shape[0]
