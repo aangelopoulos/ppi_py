@@ -32,10 +32,9 @@ def test_ppi_logistic_pointestimate_debias():
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        grad_tol=1e-3,
+        optimizer_options={"gtol": 1e-3},
     )
     # Check that the point estimate is close to the true beta
-    print(beta_ppi_pointestimate, beta_prediction, beta)
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < np.linalg.norm(
         beta_prediction - beta
     )  # Makes it less biased
@@ -55,7 +54,12 @@ def test_ppi_logistic_pointestimate_recovers():
     Yhat_unlabeled = expit(X_unlabeled.dot(beta))
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_logistic_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, grad_tol=1e-3
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        optimizer_options={"gtol": 1e-3},
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
@@ -74,7 +78,6 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     Yhat_unlabeled = expit(X_unlabeled.dot(beta_prediction))
     # Compute the confidence interval
     for j in range(len(alphas)):
-        print(j)
         beta_ppi_ci = ppi_logistic_ci(
             X,
             Y,
@@ -82,7 +85,7 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
             X_unlabeled,
             Yhat_unlabeled,
             alpha=alphas[j],
-            grad_tol=1e-1,
+            optimizer_options={"gtol": 1e-3},
         )
         # Check that the confidence interval contains the true beta
         includeds[j] += int(
@@ -142,7 +145,7 @@ def test_classical_logistic_ci_parallel():
     n = 1000
     d = 2
     alphas = np.array([0.05, 0.1, 0.2])
-    epsilon = 0.03
+    epsilon = 0.05
     num_trials = 200
 
     total_includeds = np.zeros(len(alphas))

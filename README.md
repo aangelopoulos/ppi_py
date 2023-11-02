@@ -128,3 +128,10 @@ The contents of this repository will be pushed to PyPI whenever there are substa
 The repository maintainers will approve pull requests at their discretion. Before working on one, it may be helpful to post a question on the issues page to verify if the contribution would be a good candidate for merging into the main branch.
 
 Accepted pull requests will be run through an automated [Black](https://black.readthedocs.io/en/stable/) formatter, so contributors may want to run Black locally first.
+
+# Papers 
+
+The repository currently implements the methods developed in the following papers:
+
+[Prediction-Powered Inference](https://arxiv.org/abs/2301.09633)
+[PPI++: Efficient Prediction-Powered Inference](https://arxiv.org/abs/2301.09633)
