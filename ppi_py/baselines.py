@@ -48,7 +48,7 @@ def semisupervised_mean_ci(
     alternative="two-sided",
     add_intercept=True,
 ):
-    """Semisupervised mean confidence interval from \"High-dimensional semi-supervised learning: in search of optimal inference of the mean\" by Zhang and Bradic (2022).
+    """Semisupervised mean confidence interval from `[ZB22] <https://arxiv.org/abs/1902.00772>`__.
 
     Args:
         X (ndarray): Labeled covariates.
@@ -61,6 +61,9 @@ def semisupervised_mean_ci(
 
     Returns:
         tuple: (lower, upper) confidence interval bounds.
+
+    Notes:
+        `[ZB22] <https://arxiv.org/abs/1902.00772>`__ Y. Zhang and J. Bradic, High-dimensional semi-supervised learning: in search of optimal inference of the mean. arxiv:1902.00772, 2022.
     """
     if add_intercept:
         X = np.concatenate([np.ones((X.shape[0], 1)), X], axis=1)
@@ -212,7 +215,7 @@ def postprediction_ols_ci(
     alpha=0.1,
     alternative="two-sided",
 ):
-    """Confidence interval for the OLS coefficients using the PostPI method from \"Methods for correcting inference based on outcomes predicted by machine learning\" by Wang, McCormick, and Leek (2020).
+    """Confidence interval for the OLS coefficients using the PostPI method from `[WML20] <https://www.pnas.org/doi/full/10.1073/pnas.2001238117>`__.
 
     This method does not possess any coverage guarantees unless the model is perfect, but predates Prediction-Powered Inference.
     It is included for comparison purposes.
@@ -228,6 +231,9 @@ def postprediction_ols_ci(
 
     Returns:
         tuple: (lower, upper) confidence interval bounds.
+
+    Notes:
+        `[WML20] <https://www.pnas.org/doi/full/10.1073/pnas.2001238117>`__ S. Wang, T. H. McCormick, and J. T. Leek, Methods for correcting inference based on outcomes predicted by machine learning. Proceedings of the National Academy of Sciences, 117(48): 30266-30275, 2020.
     """
     N, d = X_unlabeled.shape
     # fit map to debias predictions

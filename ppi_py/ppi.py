@@ -30,7 +30,7 @@ def _rectified_p_value(
         rectifier_std (float or ndarray): Rectifier standard deviation.
         imputed_mean (float or ndarray): Imputed mean.
         imputed_std (float or ndarray): Imputed standard deviation.
-        null (float, optional): Value of the null hypothesis to be tested. Defaults to 0.
+        null (float, optional): Value of the null hypothesis to be tested. Defaults to `0`.
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
 
     Returns:
@@ -66,8 +66,8 @@ def ppi_mean_pointestimate(
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the original PPI point estimate. If `lhat=0`, recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
@@ -75,7 +75,7 @@ def ppi_mean_pointestimate(
         float or ndarray: Prediction-powered point estimate of the mean.
 
     Notes:
-        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -136,8 +136,8 @@ def ppi_mean_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -145,7 +145,7 @@ def ppi_mean_ci(
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the mean.
 
     Notes:
-        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -228,8 +228,8 @@ def ppi_mean_pval(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         null (float): Value of the null hypothesis to be tested.
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data. If `lhat=1`, recovers the PPI point estimate. If `lhat=0`, recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -237,7 +237,7 @@ def ppi_mean_pval(
         float or ndarray: Prediction-powered p-value for the mean.
 
     Notes:
-        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
@@ -589,8 +589,8 @@ def ppi_ols_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float, optional): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -598,7 +598,7 @@ def ppi_ols_pointestimate(
         theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
 
     Notes:
-        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -671,7 +671,7 @@ def ppi_ols_ci(
     w=None,
     w_unlabeled=None,
 ):
-    """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+    """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -681,8 +681,8 @@ def ppi_ols_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Parameter for power tuning (see ADZ23). Must be in the range [0,1]. The default value None will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -690,7 +690,7 @@ def ppi_ols_ci(
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the OLS coefficients.
 
     Notes:
-        This version of the OLS confidence interval and the power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -792,9 +792,9 @@ def ppi_logistic_pointestimate(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
-    optimizer_options=None,
     lhat=None,
     coord=None,
+    optimizer_options=None,
     w=None,
     w_unlabeled=None,
 ):
@@ -806,9 +806,9 @@ def ppi_logistic_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-        lhat (float, optional): Tuning parameter for how much to factor in the model predictions. Defaults to the standard prediction-powered point-estimate.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -816,7 +816,7 @@ def ppi_logistic_pointestimate(
         theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
 
     Notes:
-        The power-tuning procedure was introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -1016,9 +1016,7 @@ def ppi_logistic_ci(
     w=None,
     w_unlabeled=None,
 ):
-    """Computes the prediction-powered confidence interval for the logistic regression coefficients using the efficient algorithm.
-
-    There is no successive refinement in this method, which makes it more efficient than the standard method.
+    """Computes the prediction-powered confidence interval for the logistic regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -1028,8 +1026,8 @@ def ppi_logistic_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Tuning parameter for how much to factor in the model predictions. If None, it is estimated from the data.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
+        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
         optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
         w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
@@ -1038,7 +1036,7 @@ def ppi_logistic_ci(
         tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
 
     Notes:
-        This version of the logistic regression confidence interval and the power-tuning procedure were introduced in the following paper: A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:, 2023.
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
     n = Y.shape[0]
     d = X.shape[1]
@@ -1123,11 +1121,11 @@ def _calc_lhat_glm(
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
         grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int, optional): Coordinate for which to optimize lhat. If none, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d=X.shape[1].
-        clip (bool, optional): Whether to clip the value of lhat to be non-negative. Defaults to False.
+        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where `d=X.shape[1]`.
+        clip (bool, optional): Whether to clip the value of lhat to be non-negative. Defaults to `False`.
 
     Returns:
-        float: Optimal value of lhat. Lies in [0,1].
+        float: Optimal value of `lhat`. Lies in [0,1].
     """
     n = grads.shape[0]
     N = grads_hat_unlabeled.shape[0]
