@@ -54,7 +54,7 @@ def _rectified_p_value(
 def ppi_mean_pointestimate(
     Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None
 ):
-    """Computes the prediction-powered point estimate of the (possibly high-dimensional) mean.
+    """Computes the prediction-powered point estimate of the d-dimensional mean.
 
     Args:
         Y (ndarray): Gold-standard labels.
@@ -122,7 +122,7 @@ def ppi_mean_ci(
     w=None,
     w_unlabeled=None,
 ):
-    """Computes the prediction-powered confidence interval for the mean.
+    """Computes the prediction-powered confidence interval for a d-dimensional mean.
 
     Args:
         Y (ndarray): Gold-standard labels.
