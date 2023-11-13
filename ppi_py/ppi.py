@@ -7,15 +7,18 @@ from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import (
+    safe_expit,
+    safe_log1pexp,
+    compute_cdf,
+    compute_cdf_diff,
     dataframe_decorator,
     linfty_dkw,
     linfty_binom,
     form_discrete_distribution,
 )
-import pdb
 
 
-def _rectified_p_value(
+def rectified_p_value(
     rectifier,
     rectifier_std,
     imputed_mean,
@@ -257,7 +260,7 @@ def ppi_mean_pval(
                 grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None
             )
 
-    return _rectified_p_value(
+    return rectified_p_value(
         (w * Y - lhat * w * Yhat).mean(),
         (w * Y - lhat * w * Yhat).std() / np.sqrt(n),
         (w_unlabeled * lhat * Yhat_unlabeled).mean(),
@@ -271,50 +274,6 @@ def ppi_mean_pval(
     QUANTILE ESTIMATION
 
 """
-
-
-def _compute_cdf(Y, grid, w=None):
-    """Computes the empirical CDF of the data.
-
-    Args:
-        Y (ndarray): Data.
-        grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray, optional): Sample weights.
-
-    Returns:
-        tuple: Empirical CDF and its standard deviation at the specified grid points.
-    """
-    w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
-    if w is None:
-        indicators = (Y[:, None] <= grid[None, :]).astype(float)
-    else:
-        indicators = ((Y[:, None] <= grid[None, :]) * w[:, None]).astype(float)
-    return indicators.mean(axis=0), indicators.std(axis=0)
-
-
-def _compute_cdf_diff(Y, Yhat, grid, w=None):
-    """Computes the difference between the empirical CDFs of the data and the predictions.
-
-    Args:
-        Y (ndarray): Data.
-        Yhat (ndarray): Predictions.
-        grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray, optional): Sample weights.
-
-    Returns:
-        tuple: Difference between the empirical CDFs of the data and the predictions and its standard deviation at the specified grid points.
-    """
-    w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
-    indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
-    indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
-    if w is None:
-        return (indicators_Y - indicators_Yhat).mean(axis=0), (
-            indicators_Y - indicators_Yhat
-        ).std(axis=0)
-    else:
-        return (w[:, None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
-            w[:, None] * (indicators_Y - indicators_Yhat)
-        ).std(axis=0)
 
 
 def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
@@ -337,8 +296,8 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
         if w_unlabeled is None
         else w_unlabeled / w_unlabeled.sum() * Yhat_unlabeled.shape[0]
     )
-    cdf_Yhat_unlabeled, _ = _compute_cdf(Yhat_unlabeled, grid, w=w_unlabeled)
-    cdf_rectifier, _ = _compute_cdf_diff(Y, Yhat, grid, w=w)
+    cdf_Yhat_unlabeled, _ = compute_cdf(Yhat_unlabeled, grid, w=w_unlabeled)
+    cdf_rectifier, _ = compute_cdf_diff(Y, Yhat, grid, w=w)
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
@@ -424,12 +383,12 @@ def ppi_quantile_ci(
         grid = np.sort(grid)
     else:
         grid = np.linspace(grid.min(), grid.max(), 5000)
-    cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = _compute_cdf(
+    cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = compute_cdf(
         Yhat_unlabeled, grid, w=w_unlabeled
     )
-    cdf_rectifier, cdf_rectifier_std = _compute_cdf_diff(Y, Yhat, grid, w=w)
+    cdf_rectifier, cdf_rectifier_std = compute_cdf_diff(Y, Yhat, grid, w=w)
     # Calculate rectified p-value for null that the rectified cdf is equal to q
-    rectified_p_value = _rectified_p_value(
+    rec_p_value = rectified_p_value(
         cdf_rectifier,
         cdf_rectifier_std / np.sqrt(n),
         cdf_Yhat_unlabeled,
@@ -438,7 +397,7 @@ def ppi_quantile_ci(
         alternative="two-sided",
     )
     # Return the min and max values of the grid where p > alpha
-    return grid[rectified_p_value > alpha][[0, -1]]
+    return grid[rec_p_value > alpha][[0, -1]]
 
 
 """
@@ -589,7 +548,7 @@ def ppi_ols_pointestimate(
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
-        theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
+        ndarray: Prediction-powered point estimate of the OLS coefficients.
 
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
@@ -615,11 +574,11 @@ def ppi_ols_pointestimate(
         if lhat is None
         else _wls(X, Y - lhat * Yhat, w=w)
     )
-    theta_pp = imputed_theta + rectifier
+    ppi_pointest = imputed_theta + rectifier
 
     if lhat is None:
         grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
-            theta_pp,
+            ppi_pointest,
             X.astype(float),
             Y,
             Yhat,
@@ -649,7 +608,7 @@ def ppi_ols_pointestimate(
             w_unlabeled=w_unlabeled,
         )
     else:
-        return theta_pp
+        return ppi_pointest
 
 
 def ppi_ols_ci(
@@ -763,23 +722,6 @@ def ppi_ols_ci(
 """
 
 
-@njit
-def safe_expit(x):
-    """Computes the sigmoid function in a numerically stable way."""
-    return np.exp(-np.logaddexp(0, -x))
-
-
-def safe_log1pexp(x):
-    """
-    Compute log(1 + exp(x)) in a numerically stable way.
-    """
-    idxs = x > 10
-    out = np.empty_like(x)
-    out[idxs] = x[idxs]
-    out[~idxs] = np.log1p(np.exp(x[~idxs]))
-    return out
-
-
 def ppi_logistic_pointestimate(
     X,
     Y,
@@ -807,7 +749,7 @@ def ppi_logistic_pointestimate(
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
-        theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
 
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.

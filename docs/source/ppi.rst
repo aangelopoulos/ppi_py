@@ -2,7 +2,7 @@
 API Reference for PPI 
 ==========================================
 
-Documentation for functions implementing some form of prediction-powered inference can be found here.
+Documentation for functions implementing prediction-powered inference can be found here.
 
 .. autofunction:: ppi_py.ppi_mean_pointestimate
 .. autofunction:: ppi_py.ppi_mean_ci
