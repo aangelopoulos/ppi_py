@@ -15,6 +15,7 @@ from .utils import (
     form_discrete_distribution,
 )
 
+
 def rectified_p_value(
     rectifier,
     rectifier_std,
@@ -717,23 +718,6 @@ def ppi_ols_ci(
     LOGISTIC REGRESSION
 
 """
-
-
-@njit
-def safe_expit(x):
-    """Computes the sigmoid function in a numerically stable way."""
-    return np.exp(-np.logaddexp(0, -x))
-
-
-def safe_log1pexp(x):
-    """
-    Compute log(1 + exp(x)) in a numerically stable way.
-    """
-    idxs = x > 10
-    out = np.empty_like(x)
-    out[idxs] = x[idxs]
-    out[~idxs] = np.log1p(np.exp(x[~idxs]))
-    return out
 
 
 def ppi_logistic_pointestimate(

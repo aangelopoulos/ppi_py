@@ -1,6 +1,25 @@
 import numpy as np
+from numba import njit
 from scipy.stats import binom
 from scipy.optimize import brentq
+
+
+@njit
+def safe_expit(x):
+    """Computes the sigmoid function in a numerically stable way."""
+    return np.exp(-np.logaddexp(0, -x))
+
+
+def safe_log1pexp(x):
+    """
+    Compute log(1 + exp(x)) in a numerically stable way.
+    """
+    idxs = x > 10
+    out = np.empty_like(x)
+    out[idxs] = x[idxs]
+    out[~idxs] = np.log1p(np.exp(x[~idxs]))
+    return out
+
 
 def compute_cdf(Y, grid, w=None):
     """Computes the empirical CDF of the data.
@@ -44,6 +63,7 @@ def compute_cdf_diff(Y, Yhat, grid, w=None):
         return (w[:, None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
             w[:, None] * (indicators_Y - indicators_Yhat)
         ).std(axis=0)
+
 
 def form_discrete_distribution(Yhat, sorted_highlow=False):
     # Construct the point estimate
