@@ -7,15 +7,15 @@ from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import (
+    compute_cdf,
+    compute_cdf_diff,
     dataframe_decorator,
     linfty_dkw,
     linfty_binom,
     form_discrete_distribution,
 )
-import pdb
 
-
-def _rectified_p_value(
+def rectified_p_value(
     rectifier,
     rectifier_std,
     imputed_mean,
@@ -271,50 +271,6 @@ def ppi_mean_pval(
     QUANTILE ESTIMATION
 
 """
-
-
-def _compute_cdf(Y, grid, w=None):
-    """Computes the empirical CDF of the data.
-
-    Args:
-        Y (ndarray): Data.
-        grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray, optional): Sample weights.
-
-    Returns:
-        tuple: Empirical CDF and its standard deviation at the specified grid points.
-    """
-    w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
-    if w is None:
-        indicators = (Y[:, None] <= grid[None, :]).astype(float)
-    else:
-        indicators = ((Y[:, None] <= grid[None, :]) * w[:, None]).astype(float)
-    return indicators.mean(axis=0), indicators.std(axis=0)
-
-
-def _compute_cdf_diff(Y, Yhat, grid, w=None):
-    """Computes the difference between the empirical CDFs of the data and the predictions.
-
-    Args:
-        Y (ndarray): Data.
-        Yhat (ndarray): Predictions.
-        grid (ndarray): Grid of values to compute the CDF at.
-        w (ndarray, optional): Sample weights.
-
-    Returns:
-        tuple: Difference between the empirical CDFs of the data and the predictions and its standard deviation at the specified grid points.
-    """
-    w = np.ones(Y.shape[0]) if w is None else w / w.sum() * Y.shape[0]
-    indicators_Y = (Y[:, None] <= grid[None, :]).astype(float)
-    indicators_Yhat = (Yhat[:, None] <= grid[None, :]).astype(float)
-    if w is None:
-        return (indicators_Y - indicators_Yhat).mean(axis=0), (
-            indicators_Y - indicators_Yhat
-        ).std(axis=0)
-    else:
-        return (w[:, None] * (indicators_Y - indicators_Yhat)).mean(axis=0), (
-            w[:, None] * (indicators_Y - indicators_Yhat)
-        ).std(axis=0)
 
 
 def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
@@ -589,7 +545,7 @@ def ppi_ols_pointestimate(
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
-        theta_pp (ndarray): Prediction-powered point estimate of the OLS coefficients.
+        ndarray: Prediction-powered point estimate of the OLS coefficients.
 
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
@@ -615,11 +571,11 @@ def ppi_ols_pointestimate(
         if lhat is None
         else _wls(X, Y - lhat * Yhat, w=w)
     )
-    theta_pp = imputed_theta + rectifier
+    ppi_pointest = imputed_theta + rectifier
 
     if lhat is None:
         grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
-            theta_pp,
+            ppi_pointest,
             X.astype(float),
             Y,
             Yhat,
@@ -649,7 +605,7 @@ def ppi_ols_pointestimate(
             w_unlabeled=w_unlabeled,
         )
     else:
-        return theta_pp
+        return ppi_pointest
 
 
 def ppi_ols_ci(
@@ -807,7 +763,7 @@ def ppi_logistic_pointestimate(
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
-        theta_pp (ndarray): Prediction-powered point estimate of the logistic regression coefficients.
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
 
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
