@@ -136,3 +136,5 @@ The repository currently implements the methods developed in the following paper
 [Prediction-Powered Inference](https://arxiv.org/abs/2301.09633)
 
 [PPI++: Efficient Prediction-Powered Inference](https://arxiv.org/abs/2311.01453)
+
+[Cross-Prediction-Powered Inference](https://arxiv.org/abs/2309.16598)
