@@ -106,6 +106,7 @@ The repository is organized into three main folders:
 - ```./tests/```
 
 The first folder, ```./ppi_py```, contains all the code that eventually gets compiled into the ```ppi_py``` package. Most importantly, there is a file, ```./ppi_py/ppi.py```, which implements all the prediction-powered point estimates, confidence intervals, and p-values for different estimators.
+The file ```./ppi_py/cross_ppi.py``` contains implementations of cross-prediction-powered inference, which allows for model training on the same data used for inference.
 There is also a file, ```./ppi_py/baselines.py```, which implements several baselines.
 Finally, the file ```./ppi_py/datasets/datasets.py``` handles the loading of the sample datasets.
 
