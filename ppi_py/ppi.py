@@ -7,6 +7,8 @@ from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import (
+    safe_expit,
+    safe_log1pexp,
     compute_cdf,
     compute_cdf_diff,
     dataframe_decorator,
@@ -258,7 +260,7 @@ def ppi_mean_pval(
                 grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None
             )
 
-    return _rectified_p_value(
+    return rectified_p_value(
         (w * Y - lhat * w * Yhat).mean(),
         (w * Y - lhat * w * Yhat).std() / np.sqrt(n),
         (w_unlabeled * lhat * Yhat_unlabeled).mean(),
@@ -294,8 +296,8 @@ def _rectified_cdf(Y, Yhat, Yhat_unlabeled, grid, w=None, w_unlabeled=None):
         if w_unlabeled is None
         else w_unlabeled / w_unlabeled.sum() * Yhat_unlabeled.shape[0]
     )
-    cdf_Yhat_unlabeled, _ = _compute_cdf(Yhat_unlabeled, grid, w=w_unlabeled)
-    cdf_rectifier, _ = _compute_cdf_diff(Y, Yhat, grid, w=w)
+    cdf_Yhat_unlabeled, _ = compute_cdf(Yhat_unlabeled, grid, w=w_unlabeled)
+    cdf_rectifier, _ = compute_cdf_diff(Y, Yhat, grid, w=w)
     return cdf_Yhat_unlabeled + cdf_rectifier
 
 
@@ -381,12 +383,12 @@ def ppi_quantile_ci(
         grid = np.sort(grid)
     else:
         grid = np.linspace(grid.min(), grid.max(), 5000)
-    cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = _compute_cdf(
+    cdf_Yhat_unlabeled, cdf_Yhat_unlabeled_std = compute_cdf(
         Yhat_unlabeled, grid, w=w_unlabeled
     )
-    cdf_rectifier, cdf_rectifier_std = _compute_cdf_diff(Y, Yhat, grid, w=w)
+    cdf_rectifier, cdf_rectifier_std = compute_cdf_diff(Y, Yhat, grid, w=w)
     # Calculate rectified p-value for null that the rectified cdf is equal to q
-    rectified_p_value = _rectified_p_value(
+    rec_p_value = rectified_p_value(
         cdf_rectifier,
         cdf_rectifier_std / np.sqrt(n),
         cdf_Yhat_unlabeled,
@@ -395,7 +397,7 @@ def ppi_quantile_ci(
         alternative="two-sided",
     )
     # Return the min and max values of the grid where p > alpha
-    return grid[rectified_p_value > alpha][[0, -1]]
+    return grid[rec_p_value > alpha][[0, -1]]
 
 
 """

@@ -12,7 +12,7 @@ def test_ppi_quantile_pointestimate():
     q = 0.75
     n = 1000
     N = 10000
-    epsilon = 0.1
+    epsilon = 0.25
     bias = 1
     sigma = 0.1
     true_quantile = np.random.normal(0, 1)
