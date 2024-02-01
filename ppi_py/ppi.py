@@ -179,6 +179,7 @@ def ppi_mean_ci(
             Y,
             Yhat,
             Yhat_unlabeled,
+            alpha=alpha,
             lhat=lhat,
             coord=coord,
             w=w,
