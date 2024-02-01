@@ -30,6 +30,27 @@ def test_ppi_mean_ci():
     assert not failed
 
 
+def test_ppi_mean_multid():
+    trials = 100
+    alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
+    n_alphas = alphas.shape[0]
+    n_dims = 5
+    epsilon = 0.1
+    includeds = np.zeros((n_alphas, n_dims))
+    for _ in range(trials):
+        Y = np.random.normal(0, 1, (10000,n_dims))
+        Yhat = np.random.normal(-2, 1, (10000,n_dims))
+        Yhat_unlabeled = np.random.normal(-2, 1, (10000,n_dims))
+        for j in range(alphas.shape[0]):
+            ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alphas[j])
+            
+            included = (ci[0] <= 0) & (ci[1] >= 0)
+            includeds[j] += included.astype(int)
+    failed = np.any(includeds / trials < 1 - alphas - epsilon)
+    assert not failed
+
+
+
 def test_ppi_mean_pval():
     trials = 1000
     alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])

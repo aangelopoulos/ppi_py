@@ -7,6 +7,7 @@ from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
 from .utils import (
+    construct_weight_vector,
     safe_expit,
     safe_log1pexp,
     compute_cdf,
@@ -15,6 +16,7 @@ from .utils import (
     linfty_dkw,
     linfty_binom,
     form_discrete_distribution,
+    reshape_to_2d
 )
 
 
@@ -74,19 +76,20 @@ def ppi_mean_pointestimate(
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
+    Y = reshape_to_2d(Y)
+    Yhat = reshape_to_2d(Yhat)
+    Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    d = Yhat.shape[1] if len(Yhat.shape) > 1 else 1
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
+    d = Yhat.shape[1]
+
+    w = construct_weight_vector(n, w, vectorized=True)
+    w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
+
     if lhat is None:
-        ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (
+        ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean(0) + (
             w * (Y - Yhat)
-        ).mean()
+        ).mean(0)
         grads = w * (Y - ppi_pointest)
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
@@ -111,7 +114,7 @@ def ppi_mean_pointestimate(
     else:
         return (w_unlabeled * lhat * Yhat_unlabeled).mean(axis=0) + (
             w * (Y - lhat * Yhat)
-        ).mean(axis=0)
+        ).mean(axis=0).squeeze()
 
 
 def ppi_mean_ci(
@@ -147,12 +150,13 @@ def ppi_mean_ci(
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     d = Y.shape[1] if len(Y.shape) > 1 else 1
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
+    
+    Y = reshape_to_2d(Y)
+    Yhat = reshape_to_2d(Yhat)
+    Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
+    
+    w = construct_weight_vector(n, w, vectorized=True)
+    w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
 
     if lhat is None:
         ppi_pointest = ppi_mean_pointestimate(
@@ -1069,17 +1073,18 @@ def _calc_lhat_glm(
     d = inv_hessian.shape[0]
     cov_grads = np.zeros((d, d))
 
-    for i in range(n):
-        cov_grads += (1 / n) * (
-            np.outer(
-                grads[i] - grads.mean(axis=0),
-                grads_hat[i] - grads_hat.mean(axis=0),
-            )
-            + np.outer(
-                grads_hat[i] - grads_hat.mean(axis=0),
-                grads[i] - grads.mean(axis=0),
-            )
-        )
+    if grads.shape[1] != d:
+        raise ValueError("Dimension mismatch between the gradient and the inverse Hessian.")
+
+    grads_cent = grads - grads.mean(axis=0)
+    grad_hat_cent = grads_hat - grads_hat.mean(axis=0)
+    cov_grads = (1 / n) * (
+        grads_cent.T @ grad_hat_cent
+        + grad_hat_cent.T @ grads_cent
+    )
+    if cov_grads.shape != (d, d):
+        cov_grads = cov_grads.reshape(d, d)
+
     var_grads_hat = np.cov(
         np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
     )
