@@ -38,17 +38,39 @@ def test_ppi_mean_multid():
     epsilon = 0.1
     includeds = np.zeros((n_alphas, n_dims))
     for _ in range(trials):
-        Y = np.random.normal(0, 1, (10000,n_dims))
-        Yhat = np.random.normal(-2, 1, (10000,n_dims))
-        Yhat_unlabeled = np.random.normal(-2, 1, (10000,n_dims))
+        Y = np.random.normal(0, 1, (10000, n_dims))
+        Yhat = np.random.normal(-2, 1, (10000, n_dims))
+        Yhat_unlabeled = np.random.normal(-2, 1, (10000, n_dims))
         for j in range(alphas.shape[0]):
             ci = ppi_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=alphas[j])
-            
+
             included = (ci[0] <= 0) & (ci[1] >= 0)
             includeds[j] += included.astype(int)
     failed = np.any(includeds / trials < 1 - alphas - epsilon)
     assert not failed
 
+
+def test_ppi_mean_elem():
+    alpha = 0.1
+    Y = np.random.normal(0, 1, 10000)
+    Yhat = np.random.normal(-2, 1, 10000)
+    Yhat_unlabeled = np.random.normal(-2, 1, 10000)
+
+    ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lambd_optim_mode="element")
+    ppi_mean_ci(
+        Y, Yhat, Yhat_unlabeled, alpha=alpha, lambd_optim_mode="element"
+    )
+    ppi_mean_pval(Y, Yhat, Yhat_unlabeled, lambd_optim_mode="element")
+
+    Y = np.random.normal(0, 1, (10000, 5))
+    Yhat = np.random.normal(-2, 1, (10000, 5))
+    Yhat_unlabeled = np.random.normal(-2, 1, (10000, 5))
+
+    ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled, lambd_optim_mode="element")
+    ppi_mean_ci(
+        Y, Yhat, Yhat_unlabeled, alpha=alpha, lambd_optim_mode="element"
+    )
+    ppi_mean_pval(Y, Yhat, Yhat_unlabeled, lambd_optim_mode="element")
 
 
 def test_ppi_mean_pval():

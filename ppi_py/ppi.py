@@ -16,7 +16,7 @@ from .utils import (
     linfty_dkw,
     linfty_binom,
     form_discrete_distribution,
-    reshape_to_2d
+    reshape_to_2d,
 )
 
 
@@ -57,7 +57,14 @@ def rectified_p_value(
 
 
 def ppi_mean_pointestimate(
-    Y, Yhat, Yhat_unlabeled, lhat=None, coord=None, w=None, w_unlabeled=None
+    Y,
+    Yhat,
+    Yhat_unlabeled,
+    lhat=None,
+    coord=None,
+    w=None,
+    w_unlabeled=None,
+    lambd_optim_mode="overall",
 ):
     """Computes the prediction-powered point estimate of the d-dimensional mean.
 
@@ -101,6 +108,7 @@ def ppi_mean_pointestimate(
             inv_hessian,
             coord=None,
             clip=True,
+            optim_mode=lambd_optim_mode,
         )
         return ppi_mean_pointestimate(
             Y,
@@ -127,6 +135,7 @@ def ppi_mean_ci(
     coord=None,
     w=None,
     w_unlabeled=None,
+    lambd_optim_mode="overall",
 ):
     """Computes the prediction-powered confidence interval for a d-dimensional mean.
 
@@ -150,11 +159,11 @@ def ppi_mean_ci(
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
     d = Y.shape[1] if len(Y.shape) > 1 else 1
-    
+
     Y = reshape_to_2d(Y)
     Yhat = reshape_to_2d(Yhat)
     Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
-    
+
     w = construct_weight_vector(n, w, vectorized=True)
     w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
 
@@ -178,6 +187,7 @@ def ppi_mean_ci(
             inv_hessian,
             coord=None,
             clip=True,
+            optim_mode=lambd_optim_mode,
         )
         return ppi_mean_ci(
             Y,
@@ -199,8 +209,8 @@ def ppi_mean_ci(
         w_unlabeled=w_unlabeled,
     )
 
-    imputed_std = (w_unlabeled * (lhat * Yhat_unlabeled)).std() / np.sqrt(N)
-    rectifier_std = (w * (Y - lhat * Yhat)).std() / np.sqrt(n)
+    imputed_std = (w_unlabeled * (lhat * Yhat_unlabeled)).std(0) / np.sqrt(N)
+    rectifier_std = (w * (Y - lhat * Yhat)).std(0) / np.sqrt(n)
 
     return _zconfint_generic(
         ppi_pointest,
@@ -220,6 +230,7 @@ def ppi_mean_pval(
     coord=None,
     w=None,
     w_unlabeled=None,
+    lambd_optim_mode="overall",
 ):
     """Computes the prediction-powered p-value for a 1D mean.
 
@@ -242,35 +253,39 @@ def ppi_mean_pval(
     """
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
+    # w = np.ones(n) if w is None else w / w.sum() * n
+    w = construct_weight_vector(n, w, vectorized=True)
+    w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
+
+    Y = reshape_to_2d(Y)
+    Yhat = reshape_to_2d(Yhat)
+    Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
+    d = Y.shape[1]
 
     if lhat is None:
-        if len(Y.shape) > 1 and Y.shape[1] > 1:
-            lhat = 1
-        else:
-            ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean() + (
-                w * (Y - Yhat)
-            ).mean()
-            grads = w * (Y - ppi_pointest)
-            grads_hat = w * (Yhat - ppi_pointest)
-            grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
-            inv_hessian = np.ones((1, 1))
-            lhat = _calc_lhat_glm(
-                grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None
-            )
+        ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean(0) + (
+            w * (Y - Yhat)
+        ).mean(0)
+        grads = w * (Y - ppi_pointest)
+        grads_hat = w * (Yhat - ppi_pointest)
+        grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
+        inv_hessian = np.eye(d)
+        lhat = _calc_lhat_glm(
+            grads,
+            grads_hat,
+            grads_hat_unlabeled,
+            inv_hessian,
+            coord=None,
+            optim_mode=lambd_optim_mode,
+        )
 
     return rectified_p_value(
-        (w * Y - lhat * w * Yhat).mean(),
-        (w * Y - lhat * w * Yhat).std() / np.sqrt(n),
-        (w_unlabeled * lhat * Yhat_unlabeled).mean(),
-        (w_unlabeled * lhat * Yhat_unlabeled).std() / np.sqrt(N),
-        null,
-        alternative,
+        rectifier=(w * Y - lhat * w * Yhat).mean(0),
+        rectifier_std=(w * Y - lhat * w * Yhat).std(0) / np.sqrt(n),
+        imputed_mean=(w_unlabeled * lhat * Yhat_unlabeled).mean(0),
+        imputed_std=(w_unlabeled * lhat * Yhat_unlabeled).std(0) / np.sqrt(N),
+        null=null,
+        alternative=alternative,
     )
 
 
@@ -1052,7 +1067,13 @@ def ppi_logistic_ci(
 
 
 def _calc_lhat_glm(
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None, clip=False
+    grads,
+    grads_hat,
+    grads_hat_unlabeled,
+    inv_hessian,
+    coord=None,
+    clip=False,
+    optim_mode="overall",
 ):
     """
     Calculates the optimal value of lhat for the prediction-powered confidence interval for GLMs.
@@ -1062,39 +1083,41 @@ def _calc_lhat_glm(
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
         grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        coord (int, optional): Coordinate for which to optimize `lhat`, when `optim_mode="overall"`.
+        If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         clip (bool, optional): Whether to clip the value of lhat to be non-negative. Defaults to `False`.
+        optim_mode (ndarray, optional): Mode for which to optimize `lhat`, either `overall` or `element`.
+        If `overall`, it optimizes the total variance over all coordinates, and the function returns a scalar.
+        If `element`, it optimizes the variance for each coordinate separately, and the function returns a vector.
+
 
     Returns:
         float: Optimal value of `lhat`. Lies in [0,1].
     """
+    grads = reshape_to_2d(grads)
+    grads_hat = reshape_to_2d(grads_hat)
+    grads_hat_unlabeled = reshape_to_2d(grads_hat_unlabeled)
     n = grads.shape[0]
     N = grads_hat_unlabeled.shape[0]
     d = inv_hessian.shape[0]
-    cov_grads = np.zeros((d, d))
-
     if grads.shape[1] != d:
-        raise ValueError("Dimension mismatch between the gradient and the inverse Hessian.")
+        raise ValueError(
+            "Dimension mismatch between the gradient and the inverse Hessian."
+        )
 
     grads_cent = grads - grads.mean(axis=0)
     grad_hat_cent = grads_hat - grads_hat.mean(axis=0)
     cov_grads = (1 / n) * (
-        grads_cent.T @ grad_hat_cent
-        + grad_hat_cent.T @ grads_cent
+        grads_cent.T @ grad_hat_cent + grad_hat_cent.T @ grads_cent
     )
-    if cov_grads.shape != (d, d):
-        cov_grads = cov_grads.reshape(d, d)
 
     var_grads_hat = np.cov(
         np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
     )
+    var_grads_hat = var_grads_hat.reshape(d, d)
 
-    if coord is None:
-        vhat = inv_hessian
-    else:
-        vhat = inv_hessian @ np.eye(d)[coord]
-
-    if d > 1:
+    vhat = inv_hessian if coord is None else inv_hessian[coord, coord]
+    if optim_mode == "overall":
         num = (
             np.trace(vhat @ cov_grads @ vhat)
             if coord is None
@@ -1105,14 +1128,19 @@ def _calc_lhat_glm(
             if coord is None
             else 2 * (1 + (n / N)) * vhat @ var_grads_hat @ vhat
         )
+        lhat = num / denom
+        lhat = lhat.item()
+    elif optim_mode == "element":
+        num = np.diag(vhat @ cov_grads @ vhat)
+        denom = 2 * (1 + (n / N)) * np.diag(vhat @ var_grads_hat @ vhat)
+        lhat = num / denom
     else:
-        num = vhat * cov_grads * vhat
-        denom = 2 * (1 + (n / N)) * vhat * var_grads_hat * vhat
-
-    lhat = num / denom
+        raise ValueError(
+            "Invalid value for optim_mode. Must be either 'overall' or 'element'."
+        )
     if clip:
         lhat = np.clip(lhat, 0, 1)
-    return lhat.item()
+    return lhat
 
 
 """
