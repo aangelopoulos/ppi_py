@@ -4,6 +4,22 @@ from scipy.stats import binom
 from scipy.optimize import brentq
 
 
+def construct_weight_vector(n_obs, existing_weight, vectorized=False):
+    res = (
+        np.ones(n_obs)
+        if existing_weight is None
+        else existing_weight / existing_weight.sum() * n_obs
+    )
+    if vectorized and (len(res.shape) == 1):
+        res = res[:, None]
+    return res
+
+
+def reshape_to_2d(x):
+    """Reshapes a 1D array to a 2D array."""
+    return x.reshape(-1, 1) if len(x.shape) == 1 else x.copy()
+
+
 @njit
 def safe_expit(x):
     """Computes the sigmoid function in a numerically stable way."""
