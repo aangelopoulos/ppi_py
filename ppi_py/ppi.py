@@ -783,8 +783,8 @@ def ppi_logistic_pointestimate(
         if w_unlabeled is None
         else w_unlabeled / w_unlabeled.sum() * N
     )
-    if "ftol" not in optimizer_options.keys():
-        optimizer_options = {"ftol": 1e-15}
+    if (optimizer_options is None) or ("ftol" not in optimizer_options.keys()):
+        optimizer_options += {"ftol": 1e-15}
 
     # Initialize theta
     theta = (
