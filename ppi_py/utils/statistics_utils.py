@@ -4,6 +4,30 @@ from scipy.stats import binom
 from scipy.optimize import brentq
 
 
+def bootstrap(data, statistic, n_resamples):
+    """
+    Bootstrap the given statistic on the data.
+
+    Args:
+        data (ndarray, list): Data to bootstrap. First dimension is the number of observations. Can be an array or a list of arrays, in which case the resamples will be paired.
+        statistic (callable): Statistic to compute. Should take data as input if data is a single array, or *data if data is a list of arrays.
+        n_resamples (int): Number of bootstrap resamples.
+
+    Returns:
+        ndarray: Bootstrap resamples of the statistic.
+    """
+    bootstrap_distribution = []
+    if not isinstance(data, list):
+        data = [data]
+    for i in range(n_resamples):
+        resample_indexes = np.random.choice(
+            data[0].shape[0], data[0].shape[0], replace=True
+        )
+        resample_data = [d[resample_indexes] for d in data]
+        bootstrap_distribution.append(statistic(*resample_data))
+    return np.array(bootstrap_distribution)
+
+
 def construct_weight_vector(n_obs, existing_weight, vectorized=False):
     res = (
         np.ones(n_obs)

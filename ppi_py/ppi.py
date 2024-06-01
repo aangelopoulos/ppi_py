@@ -6,6 +6,9 @@ from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression
+import warnings
+
+warnings.simplefilter("ignore")
 from .utils import (
     construct_weight_vector,
     safe_expit,
@@ -17,7 +20,132 @@ from .utils import (
     linfty_binom,
     form_discrete_distribution,
     reshape_to_2d,
+    bootstrap,
 )
+
+
+def ppboot(
+    estimator,
+    Y,
+    Yhat,
+    Yhat_unlabeled,
+    X=None,
+    X_unlabeled=None,
+    n_resamples=1000,
+    alpha=0.1,
+    alternative="two-sided",
+    method="percentile",
+):
+    """Computes the prediction-powered bootstrap confidence interval for the estimator.
+
+    Args:
+        estimator (callable): Estimator function. Takes in (X,Y) or (Y) and returns a point estimate.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
+        X_unlabeled (ndarray, optional): Covariates corresponding to the unlabeled data. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`. If `X` is not `None`, `X_unlabeled` must also be provided, and vice versa.
+        n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'. Defaults to `'two-sided'`.
+        method (str, optional): Method to compute the confidence interval, either 'percentile' or 'basic'. Defaults to `'percentile'`.
+
+    Returns:
+        float or ndarray: Lower and upper bounds of the prediction-powered bootstrap confidence interval for the estimator.
+
+    Notes:
+        `[Z24] <https://arxiv.org/abs/2405.18379>`__ T. Zrnic. A Note on the Prediction-Powered Bootstrap. arxiv:2405.18379, 2024.
+    """
+    if (X is None) and (X_unlabeled is not None):
+        raise ValueError(
+            "Both X and X_unlabeled must be either None, or take on values."
+        )
+
+    if X is None:
+
+        def rectified_estimator(Y, Yhat):
+            return estimator(Y) - estimator(Yhat)
+
+        ppi_pointest = (
+            estimator(Yhat_unlabeled) + estimator(Y) - estimator(Yhat)
+        )
+
+        rectifier_samples = bootstrap(
+            [Y, Yhat],
+            rectified_estimator,
+            n_resamples=n_resamples,
+        )
+
+        imputed_samples = bootstrap(
+            [Yhat_unlabeled], estimator, n_resamples=n_resamples
+        )
+
+    else:
+
+        def rectified_estimator(X, Y, Yhat):
+            return estimator(X, Y) - estimator(X, Yhat)
+
+        ppi_pointest = (
+            estimator(X_unlabeled, Yhat_unlabeled)
+            + estimator(X, Y)
+            - estimator(X, Yhat)
+        )
+
+        rectifier_samples = bootstrap(
+            [X, Y, Yhat],
+            rectified_estimator,
+            n_resamples=n_resamples,
+        )
+
+        imputed_samples = bootstrap(
+            [X_unlabeled, Yhat_unlabeled],
+            estimator,
+            n_resamples=n_resamples,
+        )
+
+    ppi_bootstrap_distribution = imputed_samples + rectifier_samples
+
+    # Deal with the different types of alternative hypotheses
+    if alternative == "two-sided":
+        alpha_lower = alpha / 2
+        alpha_upper = alpha / 2
+    elif alternative == "larger":
+        alpha_lower = alpha
+        alpha_upper = 0
+    elif alternative == "smaller":
+        alpha_lower = 0
+        alpha_upper = alpha
+
+    # Compute the lower and upper bounds depending on the method
+    if method == "percentile":
+        lower_bound = np.quantile(
+            ppi_bootstrap_distribution, alpha_lower, axis=0
+        )
+        upper_bound = np.quantile(
+            ppi_bootstrap_distribution, 1 - alpha_upper, axis=0
+        )
+    elif method == "basic":
+        lower_bound = 2 * ppi_pointest - np.quantile(
+            ppi_bootstrap_distribution, 1 - alpha_lower, axis=0
+        )
+        upper_bound = 2 * ppi_pointest - np.quantile(
+            ppi_bootstrap_distribution, alpha_upper, axis=0
+        )
+    else:
+        raise ValueError(
+            "Method must be either 'percentile' or 'basic'. The others are not implemented yet... want to contribute? ;)"
+        )
+
+    if alternative == "two-sided":
+        return lower_bound, upper_bound
+    elif alternative == "larger":
+        return -np.inf, upper_bound
+    elif alternative == "smaller":
+        return lower_bound, np.inf
+    else:
+        raise ValueError(
+            "Alternative must be either 'two-sided', 'larger' or 'smaller'."
+        )
 
 
 def rectified_p_value(
