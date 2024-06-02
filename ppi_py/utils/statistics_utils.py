@@ -4,7 +4,7 @@ from scipy.stats import binom
 from scipy.optimize import brentq
 
 
-def bootstrap(data, statistic, n_resamples):
+def bootstrap(data, statistic, n_resamples, paired="all", statistic_kwargs={}):
     """
     Bootstrap the given statistic on the data.
 
@@ -12,20 +12,33 @@ def bootstrap(data, statistic, n_resamples):
         data (ndarray, list): Data to bootstrap. First dimension is the number of observations. Can be an array or a list of arrays, in which case the resamples will be paired.
         statistic (callable): Statistic to compute. Should take data as input if data is a single array, or *data if data is a list of arrays.
         n_resamples (int): Number of bootstrap resamples.
+        paired (bool, optional): Whether to resample data in a paired way. Defaults to "all", in which case all the data is considered paired.
 
     Returns:
         ndarray: Bootstrap resamples of the statistic.
     """
-    bootstrap_distribution = []
     if not isinstance(data, list):
         data = [data]
+    if paired == "all":
+        paired = [list(range(len(data)))]
+    # Input validation: check that all the paired data have the same number of observations
+    for p in paired:
+        assert len(set([d.shape[0] for d in [data[i] for i in p]])) == 1
+    # Ensure that all the data is paired, even if only with itself
+    for j in range(len(data)):
+        if j not in [i for p in paired for i in p]:
+            paired += [[j]]
+    # Resample the data and compute the bootstrap samples
+    bootstrap_distribution = []
     for i in range(n_resamples):
-        resample_indexes = np.random.choice(
-            data[0].shape[0], data[0].shape[0], replace=True
-        )
-        resample_data = [d[resample_indexes] for d in data]
-        bootstrap_distribution.append(statistic(*resample_data))
-    return np.array(bootstrap_distribution)
+        resample_data = []
+        for p in paired:
+            resample_indexes = np.random.choice(
+                data[p[0]].shape[0], data[p[0]].shape[0], replace=True
+            )
+            resample_data += [data[i][resample_indexes] for i in p]
+        bootstrap_distribution.append(statistic(*resample_data, **statistic_kwargs))
+    return bootstrap_distribution
 
 
 def construct_weight_vector(n_obs, existing_weight, vectorized=False):

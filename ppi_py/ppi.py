@@ -33,6 +33,7 @@ def ppboot(
     X_unlabeled=None,
     lam=None,
     n_resamples=1000,
+    n_resamples_lam=50,
     alpha=0.1,
     alternative="two-sided",
     method="percentile",
@@ -46,8 +47,9 @@ def ppboot(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
         X_unlabeled (ndarray, optional): Covariates corresponding to the unlabeled data. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`. If `X` is not `None`, `X_unlabeled` must also be provided, and vice versa.
-        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ in addition to [Z24] <https://arxiv.org/abs/2405.18379>`__). The default value `None` will estimate the optimal value from data, in this case, using a nested bootstrap. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ in addition to [Z24] <https://arxiv.org/abs/2405.18379>`__). The default value `None` will estimate the optimal value from data, in this case, using a nested bootstrap. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate. NOTE: Setting `lam=None`, which is the default, will result in a nested bootstrap, which can be computationally expensive.
         n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
+        n_resamples_lam (int, optional): Number of bootstrap resamples for the power-tuning parameter. Defaults to `50`.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'. Defaults to `'two-sided'`.
         method (str, optional): Method to compute the confidence interval, either 'percentile' or 'basic'. Defaults to `'percentile'`.
@@ -64,48 +66,81 @@ def ppboot(
         )
 
     if X is None:
+        def lam_statistic(Y, Yhat, Yhat_unlabeled, estimator=None):
+            return {
+                "Y" : estimator(Y),
+                "Yhat" : estimator(Yhat),
+                "Yhat_unlabeled" : estimator(Yhat_unlabeled),
+            }
 
-        def rectified_estimator(Y, Yhat):
-            return estimator(Y) - estimator(Yhat)
+        if lam is None:
+            estimator_dicts = bootstrap(
+                [Y, Yhat, Yhat_unlabeled],
+                lam_statistic,
+                n_resamples=n_resamples_lam,
+                paired=[[0,1]],
+                statistic_kwargs={"estimator" : estimator},
+            )
+            Y_samples = np.stack([est_dict["Y"] for est_dict in estimator_dicts], axis=0)
+            Yhat_samples = np.stack([est_dict["Yhat"] for est_dict in estimator_dicts], axis=0)
+            Yhat_unlabeled_samples = np.stack([est_dict["Yhat_unlabeled"] for est_dict in estimator_dicts], axis=0)
 
-        ppi_pointest = (
-            estimator(Yhat_unlabeled) + estimator(Y) - estimator(Yhat)
-        )
+            cov_Y_Yhat = np.sum([np.cov(Y_samples[:,j], Yhat_samples[:,j])[0, 1] for j in range(Y_samples.shape[1])]) if len(Y_samples.shape) > 1 else np.cov(Y_samples, Yhat_samples)[0, 1]
+            var_Yhat = np.sum([np.var(Yhat_samples[:,j]) for j in range(Yhat_samples.shape[1])]) if len(Yhat_samples.shape) > 1 else np.var(Yhat_samples)
+            var_Yhat_unlabeled = np.sum([np.var(Yhat_unlabeled_samples[:,j]) for j in range(Yhat_unlabeled_samples.shape[1])]) if len(Yhat_unlabeled_samples.shape) > 1 else np.var(Yhat_unlabeled_samples)
+            lam = cov_Y_Yhat / (var_Yhat + var_Yhat_unlabeled)
 
-        rectifier_samples = bootstrap(
-            [Y, Yhat],
+        def rectified_estimator(Y, Yhat, Yhat_unlabeled, lam=None):
+            return lam*estimator(Yhat_unlabeled) + estimator(Y) - lam*estimator(Yhat)
+
+        ppi_pointest = rectified_estimator(Y, Yhat, Yhat_unlabeled, lam=lam)
+
+        ppi_bootstrap_distribution = np.array(bootstrap(
+            [Y, Yhat, Yhat_unlabeled],
             rectified_estimator,
             n_resamples=n_resamples,
-        )
-
-        imputed_samples = bootstrap(
-            [Yhat_unlabeled], estimator, n_resamples=n_resamples
-        )
+            paired=[[0,1]],
+            statistic_kwargs={"lam": lam},
+        ))
 
     else:
+        def lam_statistic(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, estimator=None):
+            return {
+                "XY" : estimator(X, Y),
+                "XYhat" : estimator(X, Yhat),
+                "XYhat_unlabeled" : estimator(X_unlabeled, Yhat_unlabeled),
+            }
 
-        def rectified_estimator(X, Y, Yhat):
-            return estimator(X, Y) - estimator(X, Yhat)
+        if lam is None:
+            estimator_dicts = bootstrap(
+                [X, Y, Yhat, X_unlabeled, Yhat_unlabeled],
+                lam_statistic,
+                n_resamples=n_resamples_lam,
+                paired=[[0,1,2],[3,4]],
+                statistic_kwargs={"estimator" : estimator},
+            )
+            XY_samples = np.stack([est_dict["XY"] for est_dict in estimator_dicts], axis=0)
+            XYhat_samples = np.stack([est_dict["XYhat"] for est_dict in estimator_dicts], axis=0)
+            XYhat_unlabeled_samples = np.stack([est_dict["XYhat_unlabeled"] for est_dict in estimator_dicts], axis=0)
 
-        ppi_pointest = (
-            estimator(X_unlabeled, Yhat_unlabeled)
-            + estimator(X, Y)
-            - estimator(X, Yhat)
-        )
+            cov_XY_XYhat = np.sum([np.cov(XY_samples[:,j], XYhat_samples[:,j])[0, 1] for j in range(XY_samples.shape[1])]) if len(XY_samples.shape) > 1 else np.cov(XY_samples, XYhat_samples)[0, 1]
+            var_XYhat = np.sum([np.var(XYhat_samples[:,j]) for j in range(XYhat_samples.shape[1])]) if len(XYhat_samples.shape) > 1 else np.var(XYhat_samples)
+            var_XYhat_unlabeled = np.sum([np.var(XYhat_unlabeled_samples[:,j]) for j in range(XYhat_unlabeled_samples.shape[1])]) if len(XYhat_unlabeled_samples.shape) > 1 else np.var(XYhat_unlabeled_samples)
 
-        rectifier_samples = bootstrap(
-            [X, Y, Yhat],
+            lam = cov_XY_XYhat / (var_XYhat + var_XYhat_unlabeled)
+
+        def rectified_estimator(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lam=None):
+            return lam*estimator(X_unlabeled, Yhat_unlabeled) + estimator(X, Y) - lam*estimator(X, Yhat)
+
+        ppi_pointest = rectified_estimator(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, lam=lam)
+
+        ppi_bootstrap_distribution = np.array(bootstrap(
+            [X, Y, Yhat, X_unlabeled, Yhat_unlabeled],
             rectified_estimator,
             n_resamples=n_resamples,
-        )
-
-        imputed_samples = bootstrap(
-            [X_unlabeled, Yhat_unlabeled],
-            estimator,
-            n_resamples=n_resamples,
-        )
-
-    ppi_bootstrap_distribution = imputed_samples + rectifier_samples
+            paired=[[0,1,2],[3,4]],
+            statistic_kwargs={"lam": lam},
+        ))
 
     # Deal with the different types of alternative hypotheses
     if alternative == "two-sided":
