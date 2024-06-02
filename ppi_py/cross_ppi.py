@@ -30,7 +30,7 @@ def crossppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled):
         raise ValueError(
             "Yhat_unlabeled must be a 2-dimensional array with shape (N, K)."
         )
-    return ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled.mean(axis=1), lhat=1)
+    return ppi_mean_pointestimate(Y, Yhat, Yhat_unlabeled.mean(axis=1), lam=1)
 
 
 def crossppi_mean_ci(
@@ -254,7 +254,7 @@ def crossppi_ols_pointestimate(X, Y, Yhat, X_unlabeled, Yhat_unlabeled):
             "Yhat_unlabeled must be a 2-dimensional array with shape (N, K)."
         )
     return ppi_ols_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled.mean(axis=1), lhat=1
+        X, Y, Yhat, X_unlabeled, Yhat_unlabeled.mean(axis=1), lam=1
     )
 
 

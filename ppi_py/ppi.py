@@ -31,6 +31,7 @@ def ppboot(
     Yhat_unlabeled,
     X=None,
     X_unlabeled=None,
+    lam=None,
     n_resamples=1000,
     alpha=0.1,
     alternative="two-sided",
@@ -45,6 +46,7 @@ def ppboot(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
         X_unlabeled (ndarray, optional): Covariates corresponding to the unlabeled data. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`. If `X` is not `None`, `X_unlabeled` must also be provided, and vice versa.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ in addition to [Z24] <https://arxiv.org/abs/2405.18379>`__). The default value `None` will estimate the optimal value from data, in this case, using a nested bootstrap. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
         n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'. Defaults to `'two-sided'`.
@@ -188,11 +190,11 @@ def ppi_mean_pointestimate(
     Y,
     Yhat,
     Yhat_unlabeled,
-    lhat=None,
+    lam=None,
     coord=None,
     w=None,
     w_unlabeled=None,
-    lambd_optim_mode="overall",
+    lam_optim_mode="overall",
 ):
     """Computes the prediction-powered point estimate of the d-dimensional mean.
 
@@ -200,8 +202,8 @@ def ppi_mean_pointestimate(
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the dimension of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the dimension of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
@@ -221,7 +223,7 @@ def ppi_mean_pointestimate(
     w = construct_weight_vector(n, w, vectorized=True)
     w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
 
-    if lhat is None:
+    if lam is None:
         ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean(0) + (
             w * (Y - Yhat)
         ).mean(0)
@@ -229,27 +231,27 @@ def ppi_mean_pointestimate(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lhat = _calc_lhat_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
             clip=True,
-            optim_mode=lambd_optim_mode,
+            optim_mode=lam_optim_mode,
         )
         return ppi_mean_pointestimate(
             Y,
             Yhat,
             Yhat_unlabeled,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
         )
     else:
-        return (w_unlabeled * lhat * Yhat_unlabeled).mean(axis=0) + (
-            w * (Y - lhat * Yhat)
+        return (w_unlabeled * lam * Yhat_unlabeled).mean(axis=0) + (
+            w * (Y - lam * Yhat)
         ).mean(axis=0).squeeze()
 
 
@@ -259,11 +261,11 @@ def ppi_mean_ci(
     Yhat_unlabeled,
     alpha=0.1,
     alternative="two-sided",
-    lhat=None,
+    lam=None,
     coord=None,
     w=None,
     w_unlabeled=None,
-    lambd_optim_mode="overall",
+    lam_optim_mode="overall",
 ):
     """Computes the prediction-powered confidence interval for a d-dimensional mean.
 
@@ -273,8 +275,8 @@ def ppi_mean_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -295,12 +297,12 @@ def ppi_mean_ci(
     w = construct_weight_vector(n, w, vectorized=True)
     w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
 
-    if lhat is None:
+    if lam is None:
         ppi_pointest = ppi_mean_pointestimate(
             Y,
             Yhat,
             Yhat_unlabeled,
-            lhat=1,
+            lam=1,
             w=w,
             w_unlabeled=w_unlabeled,
         )
@@ -308,21 +310,21 @@ def ppi_mean_ci(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lhat = _calc_lhat_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
             clip=True,
-            optim_mode=lambd_optim_mode,
+            optim_mode=lam_optim_mode,
         )
         return ppi_mean_ci(
             Y,
             Yhat,
             Yhat_unlabeled,
             alpha=alpha,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
@@ -332,14 +334,14 @@ def ppi_mean_ci(
         Y,
         Yhat,
         Yhat_unlabeled,
-        lhat=lhat,
+        lam=lam,
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
     )
 
-    imputed_std = (w_unlabeled * (lhat * Yhat_unlabeled)).std(0) / np.sqrt(N)
-    rectifier_std = (w * (Y - lhat * Yhat)).std(0) / np.sqrt(n)
+    imputed_std = (w_unlabeled * (lam * Yhat_unlabeled)).std(0) / np.sqrt(N)
+    rectifier_std = (w * (Y - lam * Yhat)).std(0) / np.sqrt(n)
 
     return _zconfint_generic(
         ppi_pointest,
@@ -355,11 +357,11 @@ def ppi_mean_pval(
     Yhat_unlabeled,
     null=0,
     alternative="two-sided",
-    lhat=None,
+    lam=None,
     coord=None,
     w=None,
     w_unlabeled=None,
-    lambd_optim_mode="overall",
+    lam_optim_mode="overall",
 ):
     """Computes the prediction-powered p-value for a 1D mean.
 
@@ -369,8 +371,8 @@ def ppi_mean_pval(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         null (float): Value of the null hypothesis to be tested.
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -391,7 +393,7 @@ def ppi_mean_pval(
     Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
     d = Y.shape[1]
 
-    if lhat is None:
+    if lam is None:
         ppi_pointest = (w_unlabeled * Yhat_unlabeled).mean(0) + (
             w * (Y - Yhat)
         ).mean(0)
@@ -399,20 +401,20 @@ def ppi_mean_pval(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lhat = _calc_lhat_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
-            optim_mode=lambd_optim_mode,
+            optim_mode=lam_optim_mode,
         )
 
     return rectified_p_value(
-        rectifier=(w * Y - lhat * w * Yhat).mean(0),
-        rectifier_std=(w * Y - lhat * w * Yhat).std(0) / np.sqrt(n),
-        imputed_mean=(w_unlabeled * lhat * Yhat_unlabeled).mean(0),
-        imputed_std=(w_unlabeled * lhat * Yhat_unlabeled).std(0) / np.sqrt(N),
+        rectifier=(w * Y - lam * w * Yhat).mean(0),
+        rectifier_std=(w * Y - lam * w * Yhat).std(0) / np.sqrt(n),
+        imputed_mean=(w_unlabeled * lam * Yhat_unlabeled).mean(0),
+        imputed_std=(w_unlabeled * lam * Yhat_unlabeled).std(0) / np.sqrt(N),
         null=null,
         alternative=alternative,
     )
@@ -677,7 +679,7 @@ def ppi_ols_pointestimate(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
-    lhat=None,
+    lam=None,
     coord=None,
     w=None,
     w_unlabeled=None,
@@ -690,8 +692,8 @@ def ppi_ols_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -710,21 +712,21 @@ def ppi_ols_pointestimate(
         if w_unlabeled is None
         else w_unlabeled / np.sum(w_unlabeled) * N
     )
-    use_unlabeled = lhat != 0
+    use_unlabeled = lam != 0
 
     imputed_theta = (
         _wls(X_unlabeled, Yhat_unlabeled, w=w_unlabeled)
-        if lhat is None
-        else _wls(X_unlabeled, lhat * Yhat_unlabeled, w=w_unlabeled)
+        if lam is None
+        else _wls(X_unlabeled, lam * Yhat_unlabeled, w=w_unlabeled)
     )
     rectifier = (
         _wls(X, Y - Yhat, w=w)
-        if lhat is None
-        else _wls(X, Y - lhat * Yhat, w=w)
+        if lam is None
+        else _wls(X, Y - lam * Yhat, w=w)
     )
     ppi_pointest = imputed_theta + rectifier
 
-    if lhat is None:
+    if lam is None:
         grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
             ppi_pointest,
             X.astype(float),
@@ -736,7 +738,7 @@ def ppi_ols_pointestimate(
             w_unlabeled=w_unlabeled,
             use_unlabeled=use_unlabeled,
         )
-        lhat = _calc_lhat_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -750,7 +752,7 @@ def ppi_ols_pointestimate(
             Yhat,
             X_unlabeled,
             Yhat_unlabeled,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
@@ -767,7 +769,7 @@ def ppi_ols_ci(
     Yhat_unlabeled,
     alpha=0.1,
     alternative="two-sided",
-    lhat=None,
+    lam=None,
     coord=None,
     w=None,
     w_unlabeled=None,
@@ -782,8 +784,8 @@ def ppi_ols_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -802,7 +804,7 @@ def ppi_ols_ci(
         if w_unlabeled is None
         else w_unlabeled / w_unlabeled.sum() * N
     )
-    use_unlabeled = lhat != 0  # If lhat is 0, revert to classical estimation.
+    use_unlabeled = lam != 0  # If lam is 0, revert to classical estimation.
 
     ppi_pointest = ppi_ols_pointestimate(
         X,
@@ -810,7 +812,7 @@ def ppi_ols_ci(
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
-        lhat=lhat,
+        lam=lam,
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
@@ -827,8 +829,8 @@ def ppi_ols_ci(
         use_unlabeled=use_unlabeled,
     )
 
-    if lhat is None:
-        lhat = _calc_lhat_glm(
+    if lam is None:
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -844,15 +846,15 @@ def ppi_ols_ci(
             Yhat_unlabeled,
             alpha=alpha,
             alternative=alternative,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
         )
 
-    var_unlabeled = np.cov(lhat * grads_hat_unlabeled.T).reshape(d, d)
+    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
 
-    var = np.cov(grads.T - lhat * grads_hat.T).reshape(d, d)
+    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
 
     Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
 
@@ -876,7 +878,7 @@ def ppi_logistic_pointestimate(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
-    lhat=None,
+    lam=None,
     coord=None,
     optimizer_options=None,
     w=None,
@@ -890,8 +892,8 @@ def ppi_logistic_pointestimate(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
@@ -931,11 +933,11 @@ def ppi_logistic_pointestimate(
     if len(theta.shape) == 0:
         theta = theta.reshape(1)
 
-    lhat_curr = 1 if lhat is None else lhat
+    lam_curr = 1 if lam is None else lam
 
     def rectified_logistic_loss(_theta):
         return (
-            lhat_curr
+            lam_curr
             / N
             * np.sum(
                 w_unlabeled
@@ -944,7 +946,7 @@ def ppi_logistic_pointestimate(
                     + safe_log1pexp(X_unlabeled @ _theta)
                 )
             )
-            - lhat_curr
+            - lam_curr
             / n
             * np.sum(w * (-Yhat * (X @ _theta) + safe_log1pexp(X @ _theta)))
             + 1
@@ -954,14 +956,14 @@ def ppi_logistic_pointestimate(
 
     def rectified_logistic_grad(_theta):
         return (
-            lhat_curr
+            lam_curr
             / N
             * X_unlabeled.T
             @ (
                 w_unlabeled
                 * (safe_expit(X_unlabeled @ _theta) - Yhat_unlabeled)
             )
-            - lhat_curr / n * X.T @ (w * (safe_expit(X @ _theta) - Yhat))
+            - lam_curr / n * X.T @ (w * (safe_expit(X @ _theta) - Yhat))
             + 1 / n * X.T @ (w * (safe_expit(X @ _theta) - Y))
         )
 
@@ -974,7 +976,7 @@ def ppi_logistic_pointestimate(
         options=optimizer_options,
     ).x
 
-    if lhat is None:
+    if lam is None:
         (
             grads,
             grads_hat,
@@ -990,7 +992,7 @@ def ppi_logistic_pointestimate(
             w,
             w_unlabeled,
         )
-        lhat = _calc_lhat_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -1004,7 +1006,7 @@ def ppi_logistic_pointestimate(
             X_unlabeled,
             Yhat_unlabeled,
             optimizer_options=optimizer_options,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
@@ -1097,7 +1099,7 @@ def ppi_logistic_ci(
     Yhat_unlabeled,
     alpha=0.1,
     alternative="two-sided",
-    lhat=None,
+    lam=None,
     coord=None,
     optimizer_options=None,
     w=None,
@@ -1113,8 +1115,8 @@ def ppi_logistic_ci(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
         alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
-        lhat (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lhat=1` recovers PPI with no power tuning, and setting `lhat=0` recovers the classical CLT interval.
-        coord (int, optional): Coordinate for which to optimize `lhat`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
         optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
         w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
         w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
@@ -1134,7 +1136,7 @@ def ppi_logistic_ci(
         if w_unlabeled is None
         else w_unlabeled / w_unlabeled.sum() * N
     )
-    use_unlabeled = lhat != 0
+    use_unlabeled = lam != 0
 
     ppi_pointest = ppi_logistic_pointestimate(
         X,
@@ -1143,7 +1145,7 @@ def ppi_logistic_ci(
         X_unlabeled,
         Yhat_unlabeled,
         optimizer_options=optimizer_options,
-        lhat=lhat,
+        lam=lam,
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
@@ -1160,8 +1162,8 @@ def ppi_logistic_ci(
         w_unlabeled,
         use_unlabeled=use_unlabeled,
     )
-    if lhat is None:
-        lhat = _calc_lhat_glm(
+    if lam is None:
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -1177,15 +1179,15 @@ def ppi_logistic_ci(
             alpha=alpha,
             optimizer_options=optimizer_options,
             alternative=alternative,
-            lhat=lhat,
+            lam=lam,
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
         )
 
-    var_unlabeled = np.cov(lhat * grads_hat_unlabeled.T).reshape(d, d)
+    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
 
-    var = np.cov(grads.T - lhat * grads_hat.T).reshape(d, d)
+    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
 
     Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
 
@@ -1197,7 +1199,7 @@ def ppi_logistic_ci(
     )
 
 
-def _calc_lhat_glm(
+def _calc_lam_glm(
     grads,
     grads_hat,
     grads_hat_unlabeled,
@@ -1207,23 +1209,23 @@ def _calc_lhat_glm(
     optim_mode="overall",
 ):
     """
-    Calculates the optimal value of lhat for the prediction-powered confidence interval for GLMs.
+    Calculates the optimal value of lam for the prediction-powered confidence interval for GLMs.
 
     Args:
         grads (ndarray): Gradient of the loss function with respect to the parameter evaluated at the labeled data.
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
         grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int, optional): Coordinate for which to optimize `lhat`, when `optim_mode="overall"`.
+        coord (int, optional): Coordinate for which to optimize `lam`, when `optim_mode="overall"`.
         If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
-        clip (bool, optional): Whether to clip the value of lhat to be non-negative. Defaults to `False`.
-        optim_mode (ndarray, optional): Mode for which to optimize `lhat`, either `overall` or `element`.
+        clip (bool, optional): Whether to clip the value of lam to be non-negative. Defaults to `False`.
+        optim_mode (ndarray, optional): Mode for which to optimize `lam`, either `overall` or `element`.
         If `overall`, it optimizes the total variance over all coordinates, and the function returns a scalar.
         If `element`, it optimizes the variance for each coordinate separately, and the function returns a vector.
 
 
     Returns:
-        float: Optimal value of `lhat`. Lies in [0,1].
+        float: Optimal value of `lam`. Lies in [0,1].
     """
     grads = reshape_to_2d(grads)
     grads_hat = reshape_to_2d(grads_hat)
@@ -1259,19 +1261,19 @@ def _calc_lhat_glm(
             if coord is None
             else 2 * (1 + (n / N)) * vhat @ var_grads_hat @ vhat
         )
-        lhat = num / denom
-        lhat = lhat.item()
+        lam = num / denom
+        lam = lam.item()
     elif optim_mode == "element":
         num = np.diag(vhat @ cov_grads @ vhat)
         denom = 2 * (1 + (n / N)) * np.diag(vhat @ var_grads_hat @ vhat)
-        lhat = num / denom
+        lam = num / denom
     else:
         raise ValueError(
             "Invalid value for optim_mode. Must be either 'overall' or 'element'."
         )
     if clip:
-        lhat = np.clip(lhat, 0, 1)
-    return lhat
+        lam = np.clip(lam, 0, 1)
+    return lam
 
 
 """
