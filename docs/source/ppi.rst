@@ -13,4 +13,5 @@ Documentation for functions implementing prediction-powered inference can be fou
 .. autofunction:: ppi_py.ppi_ols_ci
 .. autofunction:: ppi_py.ppi_logistic_pointestimate
 .. autofunction:: ppi_py.ppi_logistic_ci
+.. autofunction:: ppi_py.ppboot
 .. autofunction:: ppi_py.ppi_distribution_label_shift_ci

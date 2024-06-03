@@ -37,7 +37,9 @@ def bootstrap(data, statistic, n_resamples, paired="all", statistic_kwargs={}):
                 data[p[0]].shape[0], data[p[0]].shape[0], replace=True
             )
             resample_data += [data[i][resample_indexes] for i in p]
-        bootstrap_distribution.append(statistic(*resample_data, **statistic_kwargs))
+        bootstrap_distribution.append(
+            statistic(*resample_data, **statistic_kwargs)
+        )
     return bootstrap_distribution
 
 

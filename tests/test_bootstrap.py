@@ -13,76 +13,76 @@ def mean_estimator(Y):
     return np.mean(Y, axis=0)
 
 
-#def test_ppboot_mean_ci():
-#    trials = 100
-#    alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-#    epsilon = 0.1
-#    n = 150
-#    N = 1000
-#    methods = ["percentile", "basic"]
-#    includeds = {method: np.zeros_like(alphas) for method in methods}
-#    for i in range(trials):
-#        print(i)
-#        Y = np.random.normal(0, 1, n)
-#        Yhat = Y + np.random.normal(-0.5, 1, n)
-#        Yhat_unlabeled = np.random.normal(-0.5, np.sqrt(2), N)
-#        for j in range(alphas.shape[0]):
-#            for method in methods:
-#                ci = ppboot(
-#                    mean_estimator,
-#                    Y,
-#                    Yhat,
-#                    Yhat_unlabeled,
-#                    lam=None,
-#                    alpha=alphas[j],
-#                    n_resamples=1000,
-#                    method=method,
-#                )
-#                if ci[0] <= 0 and ci[1] >= 0:
-#                    includeds[method][j] += 1
-#        print({method: includeds[method] / (i+1) for method in methods})
-#    faileds = {
-#        method: np.any(includeds[method] / trials < 1 - alphas - epsilon)
-#        for method in methods
-#    }
-#    print({method: includeds[method] / trials for method in methods})
-#    assert not np.any(list(faileds.values()))
-#
-#
-#def test_ppboot_mean_multid():
-#    trials = 100
-#    alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
-#    n_alphas = alphas.shape[0]
-#    n_dims = 5
-#    epsilon = 0.1
-#    n = 150
-#    N = 1000
-#    methods = ["percentile", "basic"]
-#    includeds = {method: np.zeros((n_alphas,)) for method in methods}
-#    for i in range(trials):
-#        print(i)
-#        Y = np.random.normal(0, 1, (n, n_dims))
-#        Yhat = np.random.normal(-2, 1, (n, n_dims))
-#        Yhat_unlabeled = np.random.normal(-2, 1, (N, n_dims))
-#        for j in range(alphas.shape[0]):
-#            for method in methods:
-#                ci = ppboot(
-#                    mean_estimator,
-#                    Y,
-#                    Yhat,
-#                    Yhat_unlabeled,
-#                    alpha=alphas[j],
-#                    n_resamples=1000,
-#                    method=method,
-#                )
-#                if (ci[0][0] <= 0) and (ci[1][0] >= 0):
-#                    includeds[method][j] += 1
-#    faileds = {
-#        method: np.any(includeds[method] / trials < 1 - alphas - epsilon)
-#        for method in methods
-#    }
-#    print({method: includeds[method] / trials for method in methods})
-#    assert not np.any(list(faileds.values()))
+def test_ppboot_mean_ci():
+    trials = 100
+    alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
+    epsilon = 0.1
+    n = 150
+    N = 1000
+    methods = ["percentile", "basic"]
+    includeds = {method: np.zeros_like(alphas) for method in methods}
+    for i in range(trials):
+        print(i)
+        Y = np.random.normal(0, 1, n)
+        Yhat = Y + np.random.normal(-0.5, 1, n)
+        Yhat_unlabeled = np.random.normal(-0.5, np.sqrt(2), N)
+        for j in range(alphas.shape[0]):
+            for method in methods:
+                ci = ppboot(
+                    mean_estimator,
+                    Y,
+                    Yhat,
+                    Yhat_unlabeled,
+                    lam=None,
+                    alpha=alphas[j],
+                    n_resamples=1000,
+                    method=method,
+                )
+                if ci[0] <= 0 and ci[1] >= 0:
+                    includeds[method][j] += 1
+        print({method: includeds[method] / (i + 1) for method in methods})
+    faileds = {
+        method: np.any(includeds[method] / trials < 1 - alphas - epsilon)
+        for method in methods
+    }
+    print({method: includeds[method] / trials for method in methods})
+    assert not np.any(list(faileds.values()))
+
+
+def test_ppboot_mean_multid():
+    trials = 100
+    alphas = np.array([0.5, 0.2, 0.1, 0.05, 0.01])
+    n_alphas = alphas.shape[0]
+    n_dims = 5
+    epsilon = 0.1
+    n = 150
+    N = 1000
+    methods = ["percentile", "basic"]
+    includeds = {method: np.zeros((n_alphas,)) for method in methods}
+    for i in range(trials):
+        print(i)
+        Y = np.random.normal(0, 1, (n, n_dims))
+        Yhat = np.random.normal(-2, 1, (n, n_dims))
+        Yhat_unlabeled = np.random.normal(-2, 1, (N, n_dims))
+        for j in range(alphas.shape[0]):
+            for method in methods:
+                ci = ppboot(
+                    mean_estimator,
+                    Y,
+                    Yhat,
+                    Yhat_unlabeled,
+                    alpha=alphas[j],
+                    n_resamples=1000,
+                    method=method,
+                )
+                if (ci[0][0] <= 0) and (ci[1][0] >= 0):
+                    includeds[method][j] += 1
+    faileds = {
+        method: np.any(includeds[method] / trials < 1 - alphas - epsilon)
+        for method in methods
+    }
+    print({method: includeds[method] / trials for method in methods})
+    assert not np.any(list(faileds.values()))
 
 
 """
@@ -142,13 +142,20 @@ def test_ppboot_logistic_ci_parallel():
     num_trials = 100
     methods = ["percentile", "basic"]
 
-    total_includeds = { method : np.zeros(len(alphas)) for method in methods }
+    total_includeds = {method: np.zeros(len(alphas)) for method in methods}
 
     for method in methods:
         with ProcessPoolExecutor() as executor:
             futures = [
                 executor.submit(
-                    ppboot_logistic_ci_subtest, i, alphas, n, N, d, epsilon, method
+                    ppboot_logistic_ci_subtest,
+                    i,
+                    alphas,
+                    n,
+                    N,
+                    d,
+                    epsilon,
+                    method,
                 )
                 for i in range(num_trials)
             ]
@@ -157,5 +164,8 @@ def test_ppboot_logistic_ci_parallel():
                 total_includeds[method] += future.result()
 
     print({method: total_includeds[method] / num_trials for method in methods})
-    faileds = [ np.any(total_includeds[method] / num_trials < 1 - alphas - epsilon) for method in methods ]
+    faileds = [
+        np.any(total_includeds[method] / num_trials < 1 - alphas - epsilon)
+        for method in methods
+    ]
     assert not np.any(faileds)
