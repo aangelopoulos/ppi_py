@@ -1094,7 +1094,7 @@ def ppboot(
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
         X_unlabeled (ndarray, optional): Covariates corresponding to the unlabeled data. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`. If `X` is not `None`, `X_unlabeled` must also be provided, and vice versa.
-        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ in addition to `[Z24] <https://arxiv.org/abs/2405.18379>`__). The default value `None` will estimate the optimal value from data, in this case, using a nested bootstrap. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate. NOTE: Setting `lam=None`, which is the default, will result in a nested bootstrap, which can be computationally expensive.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ in addition to `[Z24] <https://arxiv.org/abs/2405.18379>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPBoot with no power tuning, and setting `lam=0` recovers the classical bootstrap interval.
         n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
         n_resamples_lam (int, optional): Number of bootstrap resamples for the power-tuning parameter. Defaults to `50`.
         alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
