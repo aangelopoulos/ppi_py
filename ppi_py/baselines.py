@@ -5,7 +5,7 @@ from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.isotonic import IsotonicRegression
-from .utils import dataframe_decorator
+from .utils import dataframe_decorator, bootstrap
 from .ppi import _ols, _wls
 import pdb
 
@@ -309,3 +309,100 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     return _zconfint_generic(
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
     )
+
+"""
+    BOOTSTRAP CI
+
+"""
+
+def classical_bootstrap_ci(
+    estimator,
+    Y,
+    X=None,
+    n_resamples=1000,
+    alpha=0.1,
+    alternative="two-sided",
+    method="percentile",
+):
+    """Classical bootstrap confidence interval for the estimator.
+
+    Args:
+        estimator (callable): Estimator function. Takes in (X,Y) or (Y) and returns a point estimate.
+        Y (ndarray): Gold-standard labels.
+        X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
+        n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'. Defaults to `'two-sided'`.
+        method (str, optional): Method to compute the confidence interval, either 'percentile' or 'basic'. Defaults to `'percentile'`.
+
+    Returns:
+        float or ndarray: Lower and upper bounds of the bootstrap confidence interval for the estimator.
+    """
+
+    if X is None:
+
+        pointest = estimator(Y)
+
+        bootstrap_distribution = np.array(
+            bootstrap(
+                [Y],
+                estimator,
+                n_resamples=n_resamples
+            )
+        )
+
+    else:
+
+        pointest = estimator(X, Y)
+
+        bootstrap_distribution = np.array(
+            bootstrap(
+                [X, Y],
+                estimator,
+                n_resamples=n_resamples,
+                paired=[[0, 1]]
+            )
+        )
+
+    # Deal with the different types of alternative hypotheses
+    if alternative == "two-sided":
+        alpha_lower = alpha / 2
+        alpha_upper = alpha / 2
+    elif alternative == "larger":
+        alpha_lower = alpha
+        alpha_upper = 0
+    elif alternative == "smaller":
+        alpha_lower = 0
+        alpha_upper = alpha
+
+    # Compute the lower and upper bounds depending on the method
+    if method == "percentile":
+        lower_bound = np.quantile(
+            bootstrap_distribution, alpha_lower, axis=0
+        )
+        upper_bound = np.quantile(
+            bootstrap_distribution, 1 - alpha_upper, axis=0
+        )
+    elif method == "basic":
+        lower_bound = 2 * pointest - np.quantile(
+            bootstrap_distribution, 1 - alpha_lower, axis=0
+        )
+        upper_bound = 2 * pointest - np.quantile(
+            bootstrap_distribution, alpha_upper, axis=0
+        )
+    else:
+        raise ValueError(
+            "Method must be either 'percentile' or 'basic'. The others are not implemented yet... want to contribute? ;)"
+        )
+
+    if alternative == "two-sided":
+        return lower_bound, upper_bound
+    elif alternative == "larger":
+        return -np.inf, upper_bound
+    elif alternative == "smaller":
+        return lower_bound, np.inf
+    else:
+        raise ValueError(
+            "Alternative must be either 'two-sided', 'larger' or 'smaller'."
+        )
+        

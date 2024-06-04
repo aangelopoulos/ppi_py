@@ -1071,6 +1071,12 @@ def ppi_logistic_ci(
     )
 
 
+"""
+    PPBOOT
+
+"""
+
+
 def ppboot(
     estimator,
     Y,
