@@ -310,10 +310,12 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
     )
 
+
 """
     BOOTSTRAP CI
 
 """
+
 
 def classical_bootstrap_ci(
     estimator,
@@ -344,11 +346,7 @@ def classical_bootstrap_ci(
         pointest = estimator(Y)
 
         bootstrap_distribution = np.array(
-            bootstrap(
-                [Y],
-                estimator,
-                n_resamples=n_resamples
-            )
+            bootstrap([Y], estimator, n_resamples=n_resamples)
         )
 
     else:
@@ -357,10 +355,7 @@ def classical_bootstrap_ci(
 
         bootstrap_distribution = np.array(
             bootstrap(
-                [X, Y],
-                estimator,
-                n_resamples=n_resamples,
-                paired=[[0, 1]]
+                [X, Y], estimator, n_resamples=n_resamples, paired=[[0, 1]]
             )
         )
 
@@ -377,9 +372,7 @@ def classical_bootstrap_ci(
 
     # Compute the lower and upper bounds depending on the method
     if method == "percentile":
-        lower_bound = np.quantile(
-            bootstrap_distribution, alpha_lower, axis=0
-        )
+        lower_bound = np.quantile(bootstrap_distribution, alpha_lower, axis=0)
         upper_bound = np.quantile(
             bootstrap_distribution, 1 - alpha_upper, axis=0
         )
@@ -405,4 +398,3 @@ def classical_bootstrap_ci(
         raise ValueError(
             "Alternative must be either 'two-sided', 'larger' or 'smaller'."
         )
-        
