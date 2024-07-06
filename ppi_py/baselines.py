@@ -309,6 +309,7 @@ def classical_poisson_ci(X, Y, alpha=0.1, alternative="two-sided"):
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
     )
 
+
 """
     BOOTSTRAP CI
 

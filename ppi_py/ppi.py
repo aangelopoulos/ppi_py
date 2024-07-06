@@ -1069,6 +1069,7 @@ def ppi_logistic_ci(
         alternative=alternative,
     )
 
+
 def ppi_poisson_pointestimate(
     X,
     Y,
@@ -1102,8 +1103,12 @@ def ppi_poisson_pointestimate(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
-    
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
+
     if optimizer_options is None:
         optimizer_options = {"ftol": 1e-15}
     if "ftol" not in optimizer_options.keys():
@@ -1131,14 +1136,15 @@ def ppi_poisson_pointestimate(
             / N
             * np.sum(
                 w_unlabeled
-                * (np.exp(X_unlabeled @ _theta) - Yhat_unlabeled * (X_unlabeled @ _theta))
+                * (
+                    np.exp(X_unlabeled @ _theta)
+                    - Yhat_unlabeled * (X_unlabeled @ _theta)
+                )
             )
             - lam_curr
             / n
             * np.sum(w * (np.exp(X @ _theta) - Yhat * (X @ _theta)))
-            + 1
-            / n
-            * np.sum(w * (np.exp(X @ _theta) - Y * (X @ _theta)))
+            + 1 / n * np.sum(w * (np.exp(X @ _theta) - Y * (X @ _theta)))
         )
 
     def poisson_grad(_theta):
@@ -1147,14 +1153,8 @@ def ppi_poisson_pointestimate(
             / N
             * X_unlabeled.T
             @ (w_unlabeled * (np.exp(X_unlabeled @ _theta) - Yhat_unlabeled))
-            - lam_curr
-            / n
-            * X.T
-            @ (w * (np.exp(X @ _theta) - Yhat))
-            + 1
-            / n
-            * X.T
-            @ (w * (np.exp(X @ _theta) - Y))
+            - lam_curr / n * X.T @ (w * (np.exp(X @ _theta) - Yhat))
+            + 1 / n * X.T @ (w * (np.exp(X @ _theta) - Y))
         )
 
     ppi_pointest = minimize(
@@ -1240,7 +1240,11 @@ def _poisson_get_stats(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
 
     mu = np.exp(X @ pointest)
     mu_til = np.exp(X_unlabeled @ pointest)
@@ -1316,7 +1320,11 @@ def ppi_poisson_ci(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
     use_unlabeled = lam != 0
 
     ppi_pointest = ppi_poisson_pointestimate(
@@ -1376,6 +1384,7 @@ def ppi_poisson_ci(
         alpha=alpha,
         alternative=alternative,
     )
+
 
 """
     PPBOOT

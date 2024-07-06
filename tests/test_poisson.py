@@ -7,6 +7,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
     PPI tests for Poisson regression
 """
 
+
 def test_ppi_poisson_pointestimate_debias():
     # Make a synthetic regression problem
     n = 100
@@ -34,6 +35,7 @@ def test_ppi_poisson_pointestimate_debias():
         beta_prediction - beta
     )  # Makes it less biased
 
+
 def test_ppi_poisson_pointestimate_recovers():
     # Make a synthetic regression problem
     n = 10000
@@ -57,6 +59,7 @@ def test_ppi_poisson_pointestimate_recovers():
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
+
 
 def ppi_poisson_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     includeds = np.zeros(len(alphas))
@@ -86,6 +89,7 @@ def ppi_poisson_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
         )
     return includeds
 
+
 def test_ppi_poisson_ci_parallel():
     n = 1000
     N = 10000
@@ -111,9 +115,11 @@ def test_ppi_poisson_ci_parallel():
     failed = np.any((total_includeds / num_trials) < (1 - alphas - epsilon))
     assert not failed
 
+
 """
     Baseline tests
 """
+
 
 def classical_poisson_ci_subtest(i, alphas, n, d, epsilon):
     includeds = np.zeros(len(alphas))
@@ -129,6 +135,7 @@ def classical_poisson_ci_subtest(i, alphas, n, d, epsilon):
             (beta_ci[0][0] <= beta[0]) & (beta[0] <= beta_ci[1][0])
         )
     return includeds
+
 
 def test_classical_poisson_ci_parallel():
     n = 1000
