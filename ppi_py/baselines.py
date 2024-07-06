@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.isotonic import IsotonicRegression
 from .utils import dataframe_decorator, bootstrap
 from .ppi import _ols, _wls
-import pdb
+from sklearn.linear_model import PoissonRegressor
 
 """
     MEAN ESTIMATION
@@ -258,37 +258,36 @@ def postprediction_ols_ci(
 
 
 """
-    LOGISTIC REGRESSION
+    POISSON REGRESSION
 
 """
 
 
-def logistic(X, Y):
-    """Compute the logistic regression coefficients.
+def poisson(X, Y):
+    """Compute the Poisson regression coefficients.
 
     Args:
         X (ndarray): Labeled features.
-        Y (ndarray): Labeled responses.
+        Y (ndarray): Labeled responses (count data).
 
     Returns:
-        ndarray: Logistic regression coefficients.
+        ndarray: Poisson regression coefficients.
     """
-    regression = LogisticRegression(
-        penalty=None,
-        solver="lbfgs",
+    regression = PoissonRegressor(
+        alpha=0,
+        fit_intercept=False,
         max_iter=10000,
         tol=1e-15,
-        fit_intercept=False,
     ).fit(X, Y)
-    return regression.coef_.squeeze()
+    return regression.coef_
 
 
-def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
-    """Confidence interval for the logistic regression coefficients using the classical method.
+def classical_poisson_ci(X, Y, alpha=0.1, alternative="two-sided"):
+    """Confidence interval for the Poisson regression coefficients using the classical method.
 
     Args:
-        X (ndarray): Labeled
-        Y (ndarray): Labeled responses.
+        X (ndarray): Labeled features.
+        Y (ndarray): Labeled responses (count data).
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
 
@@ -297,19 +296,18 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     """
     n = Y.shape[0]
     d = X.shape[1]
-    pointest = logistic(X, Y)
-    mu = expit(X @ pointest)
+    pointest = poisson(X, Y)
+    mu = np.exp(X @ pointest)  # Expected value for Poisson regression
     V = np.zeros((d, d))
     grads = np.zeros((n, d))
     for i in range(n):
-        V += 1 / n * mu[i] * (1 - mu[i]) * X[i : i + 1, :].T @ X[i : i + 1, :]
+        V += 1 / n * mu[i] * X[i : i + 1, :].T @ X[i : i + 1, :]
         grads[i] += (mu[i] - Y[i]) * X[i]
     V_inv = np.linalg.inv(V)
     cov_mat = V_inv @ np.cov(grads.T) @ V_inv
     return _zconfint_generic(
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
     )
-
 
 """
     BOOTSTRAP CI
