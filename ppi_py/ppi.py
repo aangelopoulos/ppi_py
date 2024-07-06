@@ -1,11 +1,10 @@
 import numpy as np
 from numba import njit
 from scipy.stats import norm, binom
-from scipy.special import expit
 from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, PoissonRegressor
 import warnings
 
 warnings.simplefilter("ignore")
@@ -1070,6 +1069,313 @@ def ppi_logistic_ci(
         alternative=alternative,
     )
 
+def ppi_poisson_pointestimate(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None,
+):
+    """Computes the prediction-powered point estimate of the Poisson regression coefficients.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels (count data).
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter. The default value `None` will estimate the optimal value from data.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the Poisson regression coefficients.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+    
+    if optimizer_options is None:
+        optimizer_options = {"ftol": 1e-15}
+    if "ftol" not in optimizer_options.keys():
+        optimizer_options["ftol"] = 1e-15
+
+    # Initialize theta
+    theta = (
+        PoissonRegressor(
+            alpha=0,
+            fit_intercept=False,
+            max_iter=10000,
+            tol=1e-15,
+        )
+        .fit(X, Y)
+        .coef_
+    )
+    if len(theta.shape) == 0:
+        theta = theta.reshape(1)
+
+    lam_curr = 1 if lam is None else lam
+
+    def poisson_loss(_theta):
+        return (
+            lam_curr
+            / N
+            * np.sum(
+                w_unlabeled
+                * (np.exp(X_unlabeled @ _theta) - Yhat_unlabeled * (X_unlabeled @ _theta))
+            )
+            - lam_curr
+            / n
+            * np.sum(w * (np.exp(X @ _theta) - Yhat * (X @ _theta)))
+            + 1
+            / n
+            * np.sum(w * (np.exp(X @ _theta) - Y * (X @ _theta)))
+        )
+
+    def poisson_grad(_theta):
+        return (
+            lam_curr
+            / N
+            * X_unlabeled.T
+            @ (w_unlabeled * (np.exp(X_unlabeled @ _theta) - Yhat_unlabeled))
+            - lam_curr
+            / n
+            * X.T
+            @ (w * (np.exp(X @ _theta) - Yhat))
+            + 1
+            / n
+            * X.T
+            @ (w * (np.exp(X @ _theta) - Y))
+        )
+
+    ppi_pointest = minimize(
+        poisson_loss,
+        theta,
+        jac=poisson_grad,
+        method="L-BFGS-B",
+        tol=optimizer_options["ftol"],
+        options=optimizer_options,
+    ).x
+
+    if lam is None:
+        (
+            grads,
+            grads_hat,
+            grads_hat_unlabeled,
+            inv_hessian,
+        ) = _poisson_get_stats(
+            ppi_pointest,
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            w,
+            w_unlabeled,
+        )
+        lam = _calc_lam_glm(
+            grads,
+            grads_hat,
+            grads_hat_unlabeled,
+            inv_hessian,
+            clip=True,
+        )
+        return ppi_poisson_pointestimate(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            optimizer_options=optimizer_options,
+            lam=lam,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+        )
+    else:
+        return ppi_pointest
+
+
+@njit
+def _poisson_get_stats(
+    pointest,
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    w=None,
+    w_unlabeled=None,
+    use_unlabeled=True,
+):
+    """Computes the statistics needed for the Poisson regression confidence interval.
+
+    Args:
+        pointest (ndarray): Point estimate of the Poisson regression coefficients.
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        w (ndarray, optional): Standard errors of the gold-standard labels.
+        w_unlabeled (ndarray, optional): Standard errors of the unlabeled data.
+        use_unlabeled (bool, optional): Whether to use the unlabeled data.
+
+    Returns:
+        grads (ndarray): Gradient of the loss function on the labeled data.
+        grads_hat (ndarray): Gradient of the loss function on the labeled predictions.
+        grads_hat_unlabeled (ndarray): Gradient of the loss function on the unlabeled predictions.
+        inv_hessian (ndarray): Inverse Hessian of the loss function on the unlabeled data.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+
+    mu = np.exp(X @ pointest)
+    mu_til = np.exp(X_unlabeled @ pointest)
+
+    hessian = np.zeros((d, d))
+    grads_hat_unlabeled = np.zeros(X_unlabeled.shape)
+    if use_unlabeled:
+        for i in range(N):
+            hessian += (
+                w_unlabeled[i]
+                / (N + n)
+                * mu_til[i]
+                * np.outer(X_unlabeled[i], X_unlabeled[i])
+            )
+            grads_hat_unlabeled[i, :] = (
+                w_unlabeled[i]
+                * X_unlabeled[i, :]
+                * (mu_til[i] - Yhat_unlabeled[i])
+            )
+
+    grads = np.zeros(X.shape)
+    grads_hat = np.zeros(X.shape)
+    for i in range(n):
+        hessian += (
+            w[i] / (N + n) * mu[i] * np.outer(X[i], X[i])
+            if use_unlabeled
+            else w[i] / n * mu[i] * np.outer(X[i], X[i])
+        )
+        grads[i, :] = w[i] * X[i, :] * (mu[i] - Y[i])
+        grads_hat[i, :] = w[i] * X[i, :] * (mu[i] - Yhat[i])
+
+    inv_hessian = np.linalg.inv(hessian).reshape(d, d)
+    return grads, grads_hat, grads_hat_unlabeled, inv_hessian
+
+
+def ppi_poisson_ci(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    alpha=0.1,
+    alternative="two-sided",
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None,
+):
+    """Computes the prediction-powered confidence interval for the Poisson regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+        w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the Poisson regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = np.ones(N) if w_unlabeled is None else w_unlabeled / w_unlabeled.sum() * N
+    use_unlabeled = lam != 0
+
+    ppi_pointest = ppi_poisson_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        optimizer_options=optimizer_options,
+        lam=lam,
+        coord=coord,
+        w=w,
+        w_unlabeled=w_unlabeled,
+    )
+
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _poisson_get_stats(
+        ppi_pointest,
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        w,
+        w_unlabeled,
+        use_unlabeled=use_unlabeled,
+    )
+    if lam is None:
+        lam = _calc_lam_glm(
+            grads,
+            grads_hat,
+            grads_hat_unlabeled,
+            inv_hessian,
+            clip=True,
+        )
+        return ppi_poisson_ci(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            alpha=alpha,
+            optimizer_options=optimizer_options,
+            alternative=alternative,
+            lam=lam,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+        )
+
+    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
+    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
+    Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
+
+    return _zconfint_generic(
+        ppi_pointest,
+        np.sqrt(np.diag(Sigma_hat) / n),
+        alpha=alpha,
+        alternative=alternative,
+    )
 
 """
     PPBOOT
