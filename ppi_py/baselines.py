@@ -5,9 +5,9 @@ from statsmodels.regression.linear_model import OLS
 from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.isotonic import IsotonicRegression
-from .utils import dataframe_decorator
+from .utils import dataframe_decorator, bootstrap
 from .ppi import _ols, _wls
-import pdb
+from sklearn.linear_model import PoissonRegressor
 
 """
     MEAN ESTIMATION
@@ -48,7 +48,7 @@ def semisupervised_mean_ci(
     alternative="two-sided",
     add_intercept=True,
 ):
-    """Semisupervised mean confidence interval from \"High-dimensional semi-supervised learning: in search of optimal inference of the mean\" by Zhang and Bradic (2022).
+    """Semisupervised mean confidence interval from `[ZB22] <https://arxiv.org/abs/1902.00772>`__.
 
     Args:
         X (ndarray): Labeled covariates.
@@ -61,6 +61,9 @@ def semisupervised_mean_ci(
 
     Returns:
         tuple: (lower, upper) confidence interval bounds.
+
+    Notes:
+        `[ZB22] <https://arxiv.org/abs/1902.00772>`__ Y. Zhang and J. Bradic, High-dimensional semi-supervised learning: in search of optimal inference of the mean. arxiv:1902.00772, 2022.
     """
     if add_intercept:
         X = np.concatenate([np.ones((X.shape[0], 1)), X], axis=1)
@@ -212,7 +215,7 @@ def postprediction_ols_ci(
     alpha=0.1,
     alternative="two-sided",
 ):
-    """Confidence interval for the OLS coefficients using the PostPI method from \"Methods for correcting inference based on outcomes predicted by machine learning\" by Wang, McCormick, and Leek (2020).
+    """Confidence interval for the OLS coefficients using the PostPI method from `[WML20] <https://www.pnas.org/doi/full/10.1073/pnas.2001238117>`__.
 
     This method does not possess any coverage guarantees unless the model is perfect, but predates Prediction-Powered Inference.
     It is included for comparison purposes.
@@ -228,6 +231,9 @@ def postprediction_ols_ci(
 
     Returns:
         tuple: (lower, upper) confidence interval bounds.
+
+    Notes:
+        `[WML20] <https://www.pnas.org/doi/full/10.1073/pnas.2001238117>`__ S. Wang, T. H. McCormick, and J. T. Leek, Methods for correcting inference based on outcomes predicted by machine learning. Proceedings of the National Academy of Sciences, 117(48): 30266-30275, 2020.
     """
     N, d = X_unlabeled.shape
     # fit map to debias predictions
@@ -252,37 +258,36 @@ def postprediction_ols_ci(
 
 
 """
-    LOGISTIC REGRESSION
+    POISSON REGRESSION
 
 """
 
 
-def logistic(X, Y):
-    """Compute the logistic regression coefficients.
+def poisson(X, Y):
+    """Compute the Poisson regression coefficients.
 
     Args:
         X (ndarray): Labeled features.
-        Y (ndarray): Labeled responses.
+        Y (ndarray): Labeled responses (count data).
 
     Returns:
-        ndarray: Logistic regression coefficients.
+        ndarray: Poisson regression coefficients.
     """
-    regression = LogisticRegression(
-        penalty=None,
-        solver="lbfgs",
+    regression = PoissonRegressor(
+        alpha=0,
+        fit_intercept=False,
         max_iter=10000,
         tol=1e-15,
-        fit_intercept=False,
     ).fit(X, Y)
-    return regression.coef_.squeeze()
+    return regression.coef_
 
 
-def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
-    """Confidence interval for the logistic regression coefficients using the classical method.
+def classical_poisson_ci(X, Y, alpha=0.1, alternative="two-sided"):
+    """Confidence interval for the Poisson regression coefficients using the classical method.
 
     Args:
-        X (ndarray): Labeled
-        Y (ndarray): Labeled responses.
+        X (ndarray): Labeled features.
+        Y (ndarray): Labeled responses (count data).
         alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
         alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
 
@@ -291,15 +296,104 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     """
     n = Y.shape[0]
     d = X.shape[1]
-    pointest = logistic(X, Y)
-    mu = expit(X @ pointest)
+    pointest = poisson(X, Y)
+    mu = np.exp(X @ pointest)  # Expected value for Poisson regression
     V = np.zeros((d, d))
     grads = np.zeros((n, d))
     for i in range(n):
-        V += 1 / n * mu[i] * (1 - mu[i]) * X[i : i + 1, :].T @ X[i : i + 1, :]
+        V += 1 / n * mu[i] * X[i : i + 1, :].T @ X[i : i + 1, :]
         grads[i] += (mu[i] - Y[i]) * X[i]
     V_inv = np.linalg.inv(V)
     cov_mat = V_inv @ np.cov(grads.T) @ V_inv
     return _zconfint_generic(
         pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
     )
+
+
+"""
+    BOOTSTRAP CI
+
+"""
+
+
+def classical_bootstrap_ci(
+    estimator,
+    Y,
+    X=None,
+    n_resamples=1000,
+    alpha=0.1,
+    alternative="two-sided",
+    method="percentile",
+):
+    """Classical bootstrap confidence interval for the estimator.
+
+    Args:
+        estimator (callable): Estimator function. Takes in (X,Y) or (Y) and returns a point estimate.
+        Y (ndarray): Gold-standard labels.
+        X (ndarray, optional): Covariates corresponding to the gold-standard labels. Defaults to `None`. If `None`, the estimator is assumed to only take in `Y`.
+        n_resamples (int, optional): Number of bootstrap resamples. Defaults to `1000`.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in (0, 1). Defaults to `0.1`.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'. Defaults to `'two-sided'`.
+        method (str, optional): Method to compute the confidence interval, either 'percentile' or 'basic'. Defaults to `'percentile'`.
+
+    Returns:
+        float or ndarray: Lower and upper bounds of the bootstrap confidence interval for the estimator.
+    """
+
+    if X is None:
+
+        pointest = estimator(Y)
+
+        bootstrap_distribution = np.array(
+            bootstrap([Y], estimator, n_resamples=n_resamples)
+        )
+
+    else:
+
+        pointest = estimator(X, Y)
+
+        bootstrap_distribution = np.array(
+            bootstrap(
+                [X, Y], estimator, n_resamples=n_resamples, paired=[[0, 1]]
+            )
+        )
+
+    # Deal with the different types of alternative hypotheses
+    if alternative == "two-sided":
+        alpha_lower = alpha / 2
+        alpha_upper = alpha / 2
+    elif alternative == "larger":
+        alpha_lower = alpha
+        alpha_upper = 0
+    elif alternative == "smaller":
+        alpha_lower = 0
+        alpha_upper = alpha
+
+    # Compute the lower and upper bounds depending on the method
+    if method == "percentile":
+        lower_bound = np.quantile(bootstrap_distribution, alpha_lower, axis=0)
+        upper_bound = np.quantile(
+            bootstrap_distribution, 1 - alpha_upper, axis=0
+        )
+    elif method == "basic":
+        lower_bound = 2 * pointest - np.quantile(
+            bootstrap_distribution, 1 - alpha_lower, axis=0
+        )
+        upper_bound = 2 * pointest - np.quantile(
+            bootstrap_distribution, alpha_upper, axis=0
+        )
+    else:
+        raise ValueError(
+            "Method must be either 'percentile' or 'basic'. The others are not implemented yet... want to contribute? ;)"
+        )
+
+    if alternative == "two-sided":
+        return lower_bound, upper_bound
+    elif alternative == "larger":
+        return -np.inf, upper_bound
+    elif alternative == "smaller":
+        return lower_bound, np.inf
+    else:
+        raise ValueError(
+            "Alternative must be either 'two-sided', 'larger' or 'smaller'."
+        )

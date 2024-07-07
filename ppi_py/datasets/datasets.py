@@ -20,6 +20,7 @@ def load_dataset(dataset_folder, dataset_name, download=True):
     dataset_google_drive_ids = {
         "alphafold": "1lOhdSJEcFbZmcIoqmlLxo3LgLG1KqPho",
         "ballots": "1DJvTWvPM6zQD0V4yGH1O7DL3kfnTE06u",
+        "census_education": "15iq7nLjwogb46v3stknMmx7kMuK9cnje",
         "census_income": "15dZeWw-RTw17-MieG4y1ILTZlreJOmBS",
         "census_healthcare": "1RjWsnq-gMngRFRj22DvezcdCVl2MxAIX",
         "forest": "1Vqi1wSmVnWh_2lLQuDwrhkGcipvoWBc0",

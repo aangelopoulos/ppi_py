@@ -33,6 +33,7 @@ To install the package, run the following code!
 
    README
    ppi
+   crossppi
    baselines
 
 Indices and tables:

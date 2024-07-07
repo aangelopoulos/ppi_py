@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
@@ -223,6 +224,7 @@ def make_plots(
         axs[0].set_yticklabels([])
 
     plt.tight_layout()
+    os.makedirs("/".join(plot_savename.split("/")[:-1]), exist_ok=True)
     plt.savefig(plot_savename)
 
 
