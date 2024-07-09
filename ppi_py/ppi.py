@@ -1691,7 +1691,7 @@ def _calc_lam_glm(
     )
     var_grads_hat = var_grads_hat.reshape(d, d)
 
-    vhat = inv_hessian if coord is None else inv_hessian[coord, coord]
+    vhat = inv_hessian if coord is None else inv_hessian[coord, :]
     if optim_mode == "overall":
         num = (
             np.trace(vhat @ cov_grads @ vhat)
