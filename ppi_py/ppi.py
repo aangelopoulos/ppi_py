@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+import pdb
 from scipy.stats import norm, binom
 from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
@@ -68,6 +69,7 @@ def ppi_mean_pointestimate(
     w=None,
     w_unlabeled=None,
     lam_optim_mode="overall",
+    one_step=False,
 ):
     """Computes the prediction-powered point estimate of the d-dimensional mean.
 
@@ -110,9 +112,15 @@ def ppi_mean_pointestimate(
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
-            clip=True,
+            clip=(not one_step),
             optim_mode=lam_optim_mode,
         )
+        if one_step:
+            return ppi_pointest - inv_hessian @ (
+                lam * grads_hat_unlabeled.mean(axis=0)
+                + grads.mean(axis=0)
+                - lam * grads_hat.mean(axis=0)
+            )
         return ppi_mean_pointestimate(
             Y,
             Yhat,
@@ -121,6 +129,7 @@ def ppi_mean_pointestimate(
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
+            one_step=one_step,
         )
     else:
         return (w_unlabeled * lam * Yhat_unlabeled).mean(axis=0) + (
@@ -139,6 +148,7 @@ def ppi_mean_ci(
     w=None,
     w_unlabeled=None,
     lam_optim_mode="overall",
+    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for a d-dimensional mean.
 
@@ -178,6 +188,7 @@ def ppi_mean_ci(
             lam=1,
             w=w,
             w_unlabeled=w_unlabeled,
+            one_step=one_step,
         )
         grads = w * (Y - ppi_pointest)
         grads_hat = w * (Yhat - ppi_pointest)
@@ -189,7 +200,7 @@ def ppi_mean_ci(
             grads_hat_unlabeled,
             inv_hessian,
             coord=None,
-            clip=True,
+            clip=(not one_step),
             optim_mode=lam_optim_mode,
         )
         return ppi_mean_ci(
@@ -201,6 +212,7 @@ def ppi_mean_ci(
             coord=coord,
             w=w,
             w_unlabeled=w_unlabeled,
+            one_step=one_step,
         )
 
     ppi_pointest = ppi_mean_pointestimate(
@@ -211,6 +223,7 @@ def ppi_mean_ci(
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
+        one_step=one_step,
     )
 
     imputed_std = (w_unlabeled * (lam * Yhat_unlabeled)).std(0) / np.sqrt(N)
@@ -556,6 +569,7 @@ def ppi_ols_pointestimate(
     coord=None,
     w=None,
     w_unlabeled=None,
+    one_step=False
 ):
     """Computes the prediction-powered point estimate of the OLS coefficients.
 
@@ -615,19 +629,26 @@ def ppi_ols_pointestimate(
             grads_hat_unlabeled,
             inv_hessian,
             coord,
-            clip=True,
-        )
-        return ppi_ols_pointestimate(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-        )
+            clip=(not one_step),
+        )        
+        if one_step:
+            return ppi_pointest - inv_hessian @ (
+                ppi_pointest * grads_hat_unlabeled.mean(axis=0)
+                + grads.mean(axis=0)
+                - lam * grads_hat.mean(axis=0)
+            )
+        else: 
+            return ppi_ols_pointestimate(
+                X,
+                Y,
+                Yhat,
+                X_unlabeled,
+                Yhat_unlabeled,
+                lam=lam,
+                coord=coord,
+                w=w,
+                w_unlabeled=w_unlabeled,
+            )
     else:
         return ppi_pointest
 
@@ -644,6 +665,7 @@ def ppi_ols_ci(
     coord=None,
     w=None,
     w_unlabeled=None,
+    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for the OLS coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
 
@@ -687,6 +709,7 @@ def ppi_ols_ci(
         coord=coord,
         w=w,
         w_unlabeled=w_unlabeled,
+        one_step=one_step
     )
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
         ppi_pointest,
@@ -707,7 +730,7 @@ def ppi_ols_ci(
             grads_hat_unlabeled,
             inv_hessian,
             coord,
-            clip=True,
+            clip=(not one_step),
         )
         return ppi_ols_ci(
             X,
@@ -754,6 +777,7 @@ def ppi_logistic_pointestimate(
     optimizer_options=None,
     w=None,
     w_unlabeled=None,
+    one_step=False,
 ):
     """Computes the prediction-powered point estimate of the logistic regression coefficients.
 
@@ -870,18 +894,25 @@ def ppi_logistic_pointestimate(
             inv_hessian,
             clip=True,
         )
-        return ppi_logistic_pointestimate(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            optimizer_options=optimizer_options,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-        )
+        if one_step:
+            return ppi_pointest - inv_hessian @ (
+                lam * grads_hat_unlabeled.mean(axis=0)
+                + grads.mean(axis=0)
+                - lam * grads_hat.mean(axis=0)
+            )
+        else:
+            return ppi_logistic_pointestimate(
+                X,
+                Y,
+                Yhat,
+                X_unlabeled,
+                Yhat_unlabeled,
+                optimizer_options=optimizer_options,
+                lam=lam,
+                coord=coord,
+                w=w,
+                w_unlabeled=w_unlabeled,
+            )
     else:
         return ppi_pointest
 
@@ -975,6 +1006,7 @@ def ppi_logistic_ci(
     optimizer_options=None,
     w=None,
     w_unlabeled=None,
+    one_step=False,
 ):
     """Computes the prediction-powered confidence interval for the logistic regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
 
@@ -1039,22 +1071,51 @@ def ppi_logistic_ci(
             grads_hat,
             grads_hat_unlabeled,
             inv_hessian,
-            clip=True,
+            clip=(not one_step),
         )
-        return ppi_logistic_ci(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            alpha=alpha,
-            optimizer_options=optimizer_options,
-            alternative=alternative,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-        )
+        if one_step:
+            onestep_ppi_pointest = ppi_logistic_pointestimate(
+                X,
+                Y,
+                Yhat,
+                X_unlabeled,
+                Yhat_unlabeled,
+                optimizer_options=optimizer_options,
+                lam=lam,
+                coord=coord,
+                w=w,
+                w_unlabeled=w_unlabeled,
+                one_step=True,
+            )
+            var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
+
+            var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
+
+            Sigma_hat = (
+                inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
+            )
+
+            return _zconfint_generic(
+                onestep_ppi_pointest,
+                np.sqrt(np.diag(Sigma_hat) / n),
+                alpha=alpha,
+                alternative=alternative,
+            )
+        else:
+            return ppi_logistic_ci(
+                X,
+                Y,
+                Yhat,
+                X_unlabeled,
+                Yhat_unlabeled,
+                alpha=alpha,
+                optimizer_options=optimizer_options,
+                alternative=alternative,
+                lam=lam,
+                coord=coord,
+                w=w,
+                w_unlabeled=w_unlabeled,
+            )
 
     var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
 
@@ -1833,7 +1894,7 @@ def _calc_lam_glm(
     )
     var_grads_hat = var_grads_hat.reshape(d, d)
 
-    vhat = inv_hessian if coord is None else inv_hessian[coord, coord]
+    vhat = inv_hessian if coord is None else inv_hessian[coord, :]
     if optim_mode == "overall":
         num = (
             np.trace(vhat @ cov_grads @ vhat)
