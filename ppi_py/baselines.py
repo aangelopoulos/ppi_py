@@ -258,6 +258,61 @@ def postprediction_ols_ci(
 
 
 """
+    LOGISTIC REGRESSION
+
+"""
+
+
+def logistic(X, Y):
+    """Compute the logistic regression coefficients.
+
+    Args:
+        X (ndarray): Labeled features.
+        Y (ndarray): Labeled responses.
+
+    Returns:
+        ndarray: Logistic regression coefficients.
+    """
+    regression = LogisticRegression(
+        penalty=None,
+        solver="lbfgs",
+        max_iter=10000,
+        tol=1e-15,
+        fit_intercept=False,
+    ).fit(X, Y)
+    return regression.coef_.squeeze()
+
+
+def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
+    """Confidence interval for the logistic regression coefficients using the classical method.
+
+    Args:
+        X (ndarray): Labeled
+        Y (ndarray): Labeled responses.
+        alpha (float, optional): Error level. Confidence interval will target a coverage of 1 - alpha. Defaults to 0.1. Must be in (0, 1).
+        alternative (str, optional): One of "two-sided", "less", or "greater". Defaults to "two-sided".
+
+    Returns:
+        tuple: (lower, upper) confidence interval bounds.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    pointest = logistic(X, Y)
+    mu = expit(X @ pointest)
+    V = np.zeros((d, d))
+    grads = np.zeros((n, d))
+    for i in range(n):
+        V += 1 / n * mu[i] * (1 - mu[i]) * X[i : i + 1, :].T @ X[i : i + 1, :]
+        grads[i] += (mu[i] - Y[i]) * X[i]
+    V_inv = np.linalg.inv(V)
+    cov_mat = V_inv @ np.cov(grads.T) @ V_inv
+    return _zconfint_generic(
+        pointest, np.sqrt(np.diag(cov_mat) / n), alpha, alternative
+    )
+
+
+
+"""
     POISSON REGRESSION
 
 """
