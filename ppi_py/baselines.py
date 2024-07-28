@@ -311,7 +311,6 @@ def classical_logistic_ci(X, Y, alpha=0.1, alternative="two-sided"):
     )
 
 
-
 """
     POISSON REGRESSION
 
