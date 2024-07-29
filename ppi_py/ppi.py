@@ -1759,7 +1759,7 @@ def ppi_distribution_label_shift_ci(
 
     # Invert Ahat
     Ahatinv = np.linalg.inv(Ahat)
-    qfhat = form_discrete_distribution(Yhat_unlabeled, sorted_highlow=True)
+    qfhat = form_discrete_distribution(Yhat_unlabeled)
 
     # Calculate the bound
     point_estimate = nu @ Ahatinv @ qfhat
