@@ -1,6 +1,6 @@
 import numpy as np
-from .utils import reshape_to_2d, construct_weight_vector
-from . import ppi_mean_pointestimate
+from ppi_py.utils import reshape_to_2d, construct_weight_vector
+from ppi_py import ppi_mean_pointestimate
 
 """
     MEAN POWER CALCULATION
@@ -15,11 +15,8 @@ def ppi_mean_power(
         cost_Yhat,
         budget=None,
         se_tol=None,
-        lam=None,
-        coord=None,
         w=None,
-        w_unlabeled=None,
-        lam_optim_mode="overall"       
+        w_unlabeled=None     
 ):
     """
     Computes the optimal pair of sample sizes for estimating the mean with ppi.
@@ -32,8 +29,6 @@ def ppi_mean_power(
         cost_Yhat (float): Cost per prediction.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
-        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the dimension of the estimand.
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
@@ -59,7 +54,7 @@ def ppi_mean_power(
     Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
     n = Y.shape[0]
     N = Yhat_unlabeled.shape[0]
-    d = Yhat.shape[1]
+    d = 1
 
     w = construct_weight_vector(n, w, vectorized=True)
     w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
@@ -68,11 +63,8 @@ def ppi_mean_power(
         Y,
         Yhat,
         Yhat_unlabeled,
-        lam=lam,
-        coord=coord,
         w=w,
-        w_unlabeled=w_unlabeled,
-        lam_optim_mode=lam_optim_mode
+        w_unlabeled=w_unlabeled
     )
 
     grads = w * (Y - ppi_pointest)
@@ -84,8 +76,7 @@ def ppi_mean_power(
         grads,
         grads_hat,
         grads_hat_unlabeled,
-        inv_hessian,
-        coord=coord
+        inv_hessian
     )
 
     if budget is not None:
@@ -138,12 +129,12 @@ def _get_power_analysis_params(
         np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
     )
     var_grads_hat = var_grads_hat.reshape(d, d)
-    var_grads = np.cov(grads.T)
-
+    var_grads = grads_cent.T @ grads_cent / n
     sigma_sq = np.diag(inv_hessian @ var_grads @ inv_hessian)
-    num = np.diag(inv_hessian @ cov_grads @ inv_hessian)
+    num = np.diag(inv_hessian @ cov_grads @ inv_hessian)**2
     denom = sigma_sq * np.diag(inv_hessian @ var_grads_hat @ inv_hessian)
     rho_sq = num / denom
+    rho_sq = np.minimum(rho_sq, 1-1/n)
     return sigma_sq, rho_sq
 
 
@@ -182,7 +173,7 @@ def _get_powerful_pair(
         n = budget / classical_cost
         N = 0
         cost = n * (cost_Y + cost_X)
-        
+
     se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
     return n, N, cost, se
 
