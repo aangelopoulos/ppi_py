@@ -159,7 +159,11 @@ def _get_powerful_pair(
         budget (float): Total budget.
 
     Returns:
-        tuple: Optimal pair of sample sizes.    
+        dictionary: 
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Standard error of the PPI estimator   
     """
     gamma = (cost_Yhat + cost_X) / cost_Y
     ppi_cost = cost_Y * (1 - rho_sq + gamma * rho_sq + 2 * np.sqrt(gamma * rho_sq * (1 - rho_sq)))
@@ -167,15 +171,13 @@ def _get_powerful_pair(
 
     if classical_cost > ppi_cost:
         n0 = budget / ppi_cost
-        n, N = _optimal_pair(n0, rho_sq, gamma)
-        cost = n * cost_Y + (n + N) * (cost_Yhat + cost_X)
+        return(_optimal_pair(n0, sigma_sq, rho_sq, gamma, cost_Y))
     else:
         n = budget / classical_cost
-        N = 0
-        cost = n * (cost_Y + cost_X)
+        N = np.zeros_like(n)
+        return({"n" : n, "N" : N, "cost" : n * (cost_Y+cost_X), "se" : (sigma_sq / n)**0.5})
 
-    se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
-    return n, N, cost, se
+
 
 
 def _get_cheap_pair(
@@ -198,7 +200,11 @@ def _get_cheap_pair(
         se_tol (float): Desired standard error.
 
     Returns:
-        tuple: Optimal pair of sample sizes.    
+        dictionary: 
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Standard error of the PPI estimator      
     """
     gamma = (cost_Yhat + cost_X) / cost_Y
     ppi_cost = cost_Y * (1 - rho_sq + gamma * rho_sq + 2 * np.sqrt(gamma * rho_sq * (1 - rho_sq)))
@@ -206,37 +212,47 @@ def _get_cheap_pair(
 
     if classical_cost > ppi_cost:
         n0 = sigma_sq / se_tol**2
-        n, N = _optimal_pair(n0, rho_sq, gamma)
-        cost = n * cost_Y + (n + N) * (cost_Yhat + cost_X)
+        return(_optimal_pair(n0, sigma_sq, rho_sq, gamma, cost_Y))
     else:
         n = sigma_sq / se_tol**2
-        N = 0
-        cost = n * (cost_Y + cost_X)
+        N = np.zeros_like(n)
+        return({"n" : n, "N" : N, "cost" : n * (cost_Y+cost_X), "se" : (sigma_sq / n)**0.5})
 
-    se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
-    return n, N, cost, se
         
 
 def _optimal_pair(
         n0,
+        sigma_sq,
         rho_sq,
-        gamma
+        gamma,
+        cost_Y
 ):
     """"
     Compute the optimal pair of PPI samples achieving the same standard error as a classical estimator with n0 samples.
 
     Args:
         n0 (float): Number of samples for the classical estimator.
+        sigma_sq (float): Variance of the classical point estimate.
         rho_sq (float): PPI correlation squared.
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
-
+        cost_Y (float): Cost per gold-standard label.
     Returns:
-        float: Optimal number of gold-labeled samples.
-        float: Optimal number of unlabeled samples.
+        dictionary: 
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Standard error of the PPI estimator
+        
     """
     n = n0 * (1 - rho_sq + np.sqrt(gamma * rho_sq * (1 - rho_sq)))
     N = n * (n0 - n) / (n - (1 - rho_sq) * n0)
-    return n, N
+    n = n.astype(int)
+    N = N.astype(int)
+
+    cost = n * cost_Y + (n + N) * gamma * cost_Y
+    se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
+
+    return {"n": n, "N": N, "cost": cost, "se": se}
 
 
 
