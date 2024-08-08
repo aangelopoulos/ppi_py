@@ -1,6 +1,6 @@
 import numpy as np
 from ppi_py.utils import reshape_to_2d, construct_weight_vector
-from ppi_py import ppi_mean_pointestimate
+from ppi_py.ppi import ppi_mean_pointestimate, ppi_ols_pointestimate, _ols_get_stats
 
 """
     MEAN POWER CALCULATION
@@ -33,7 +33,11 @@ def ppi_mean_power(
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
     Returns:
-        tuple: Optimal pair of sample sizes either giving the most powerful pair with the given budget or the cheapest pair achieving the desired standard error. 
+        dict: containing the following
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
 
     Notes:
         At least one of `budget` and `se_tol` must be provided. If both are provided, `budget` will be used.
@@ -114,9 +118,11 @@ def _get_power_analysis_params(
     grads = reshape_to_2d(grads)
     grads_hat = reshape_to_2d(grads_hat)
     grads_hat_unlabeled = reshape_to_2d(grads_hat_unlabeled)
+
     n = grads.shape[0]
     N = grads_hat_unlabeled.shape[0]
     d = inv_hessian.shape[0]
+
     if grads.shape[1] != d:
         raise ValueError(
             "Dimension mismatch between the gradient and the inverse Hessian."
@@ -130,11 +136,14 @@ def _get_power_analysis_params(
     )
     var_grads_hat = var_grads_hat.reshape(d, d)
     var_grads = grads_cent.T @ grads_cent / n
+
     sigma_sq = np.diag(inv_hessian @ var_grads @ inv_hessian)
+
     num = np.diag(inv_hessian @ cov_grads @ inv_hessian)**2
     denom = sigma_sq * np.diag(inv_hessian @ var_grads_hat @ inv_hessian)
     rho_sq = num / denom
     rho_sq = np.minimum(rho_sq, 1-1/n)
+
     return sigma_sq, rho_sq
 
 
@@ -210,6 +219,8 @@ def _get_cheap_pair(
     ppi_cost = cost_Y * (1 - rho_sq + gamma * rho_sq + 2 * np.sqrt(gamma * rho_sq * (1 - rho_sq)))
     classical_cost = (cost_Y + cost_X) * sigma_sq
 
+    
+
     if classical_cost > ppi_cost:
         n0 = sigma_sq / se_tol**2
         return(_optimal_pair(n0, sigma_sq, rho_sq, gamma, cost_Y))
@@ -252,8 +263,91 @@ def _optimal_pair(
     cost = n * cost_Y + (n + N) * gamma * cost_Y
     se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
 
-    return {"n": n, "N": N, "cost": cost, "se": se}
+    return {"n": n, "N": N, "cost": cost, "se": se, "sigma_sq": sigma_sq, "rho_sq": rho_sq}
 
 
+def ppi_ols_power(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    cost_Y,
+    cost_Yhat,
+    cost_X,
+    coord,
+    budget=None,
+    se_tol=None,
+    w=None,
+    w_unlabeled=None, 
+):
+    """
+    Computes the optimal pair of sample sizes for estimating OLS coefficients with PPI.
 
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        cost_Y (float): Cost per gold-standard label.
+        cost_Yhat (float): Cost per prediction.
+        cost_X (float): Cost per unlabeled data point.
+        coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
+        budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
+        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+
+    Returns:
+        dict: containing the following
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator.
+    
+    Notes:
+        At least one of `budget` and `se_tol` must be provided. If both are provided, `budget` will be used.
+    """
+    if budget is None and se_tol is None:
+        raise ValueError(
+            "At least one of `budget` and `se_tol` must be provided."
+        )
+    
+    ppi_pointest = ppi_ols_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        w=w,
+        w_unlabeled=w_unlabeled
+    )
+
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
+        ppi_pointest,
+        X.astype(float),
+        Y,
+        Yhat,
+        X_unlabeled.astype(float),
+        Yhat_unlabeled,
+        w=w,
+        w_unlabeled=w_unlabeled
+    )
+
+    sigma_sq, rho_sq = _get_power_analysis_params(
+        grads,
+        grads_hat,
+        grads_hat_unlabeled,
+        inv_hessian
+    )
+
+    if budget is not None:
+        return _get_powerful_pair(
+            sigma_sq[coord], rho_sq[coord], cost_Y, cost_Yhat, cost_X, budget
+        )
+    else:
+        return _get_cheap_pair(
+            sigma_sq[coord], rho_sq[coord], cost_Y, cost_Yhat, cost_X, se_tol
+        )
 
