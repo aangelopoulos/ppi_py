@@ -7,8 +7,8 @@ from .ppi import (
     _ols_get_stats, 
     ppi_logistic_pointestimate, 
     _logistic_get_stats,
-    # ppi_poisson_pointestimate,
-    # _poisson_get_stats
+    ppi_poisson_pointestimate,
+    _poisson_get_stats
 )
 
 
@@ -578,109 +578,110 @@ def ppi_logistic_power(
     POISSON REGRESSION POWER CALCULATION
 """
 
-# def ppi_poisson_power(
-#         X,
-#         Y,
-#         Yhat,
-#         X_unlabeled,
-#         Yhat_unlabeled,
-#         cost_Y,
-#         cost_Yhat,
-#         cost_X,
-#         coord,
-#         budget=None,
-#         se_tol=None,
-#         w=None,
-#         w_unlabeled=None,
-# ):
-#     """
-#     Computes the optimal pair of sample sizes for estimating Poisson regression coefficients with PPI.
+def ppi_poisson_power(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        cost_Y,
+        cost_Yhat,
+        cost_X,
+        coord,
+        budget=None,
+        se_tol=None,
+        w=None,
+        w_unlabeled=None,
+):
+    """
+    Computes the optimal pair of sample sizes for estimating Poisson regression coefficients with PPI.
     
-#     Args:
-#         X (ndarray): Covariates corresponding to the gold-standard labels.
-#         Y (ndarray): Gold-standard labels.
-#         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-#         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-#         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-#         cost_Y (float): Cost per gold-standard label.
-#         cost_Yhat (float): Cost per prediction.
-#         cost_X (float): Cost per unlabeled data point.
-#         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
-#         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
-#         se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
-#         w (ndarray, optional): Sample weights for the labeled data set.
-#         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        cost_Y (float): Cost per gold-standard label.
+        cost_Yhat (float): Cost per prediction.
+        cost_X (float): Cost per unlabeled data point.
+        coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
+        budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
+        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
         
-#     Returns:
-#         Pandas data frame: containing the following columns
-#             n (int): Optimal number of gold-labeled samples.
-#             N (int): Optimal number of unlabeled samples.
-#             cost (float): Total cost.
-#             se (float): Estimated standard error of the PPI estimator. 
-#             sigma_sq (float): Asymptotic variance of the classical point estimate.
-#             rho_sq (float): PPI correlation squared.
-#     """
-#     if budget is None and se_tol is None:
-#         raise ValueError(
-#             "At least one of `budget` and `se_tol` must be provided."
-#         )
+    Returns:
+        Pandas data frame: containing the following columns
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
+            sigma_sq (float): Asymptotic variance of the classical point estimate.
+            rho_sq (float): PPI correlation squared.
+    """
+    if budget is None and se_tol is None:
+        raise ValueError(
+            "At least one of `budget` and `se_tol` must be provided."
+        )
 
-#     ppi_pointest = ppi_poisson_pointestimate(
-#         X,
-#         Y,
-#         Yhat,
-#         X_unlabeled,
-#         Yhat_unlabeled,
-#         w=w,
-#         w_unlabeled=w_unlabeled
-#     )
+    ppi_pointest = ppi_poisson_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        w=w,
+        w_unlabeled=w_unlabeled
+    )
 
-#     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _poisson_get_stats(
-#         ppi_pointest,
-#         X.astype(float),
-#         Y,
-#         Yhat,
-#         X_unlabeled.astype(float),
-#         Yhat_unlabeled,
-#         w=w,
-#         w_unlabeled=w_unlabeled
-#     )
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _poisson_get_stats(
+        ppi_pointest,
+        X.astype(float),
+        Y,
+        Yhat,
+        X_unlabeled.astype(float),
+        Yhat_unlabeled,
+        w=w,
+        w_unlabeled=w_unlabeled
+    )
 
-#     sigma_sq, rho_sq = _get_power_analysis_params(
-#         grads,
-#         grads_hat,
-#         grads_hat_unlabeled,
-#         inv_hessian
-#     )
+    sigma_sq, rho_sq = _get_power_analysis_params(
+        grads,
+        grads_hat,
+        grads_hat_unlabeled,
+        inv_hessian,
+        coord=coord
+    )
 
-#     gamma, ppi_cost, classical_cost = _get_costs(
-#         rho_sq,
-#         cost_Y,
-#         cost_Yhat,
-#         cost_X
-#     )
+    gamma, ppi_cost, classical_cost = _get_costs(
+        rho_sq,
+        cost_Y,
+        cost_Yhat,
+        cost_X
+    )
 
-#     if budget is not None:
-#         return _get_powerful_pair(
-#             sigma_sq, 
-#             rho_sq,
-#             gamma,
-#             ppi_cost,
-#             classical_cost, 
-#             cost_Y, 
-#             cost_Yhat, 
-#             cost_X, 
-#             budget
-#         )
-#     else:
-#         return _get_cheap_pair(
-#             sigma_sq, 
-#             rho_sq,
-#             gamma,
-#             ppi_cost,
-#             classical_cost, 
-#             cost_Y, 
-#             cost_Yhat, 
-#             cost_X, 
-#             se_tol
-#         )    
+    if budget is not None:
+        return _get_powerful_pair(
+            sigma_sq, 
+            rho_sq,
+            gamma,
+            ppi_cost,
+            classical_cost, 
+            cost_Y, 
+            cost_Yhat, 
+            cost_X, 
+            budget
+        )
+    else:
+        return _get_cheap_pair(
+            sigma_sq, 
+            rho_sq,
+            gamma,
+            ppi_cost,
+            classical_cost, 
+            cost_Y, 
+            cost_Yhat, 
+            cost_X, 
+            se_tol
+        )    
