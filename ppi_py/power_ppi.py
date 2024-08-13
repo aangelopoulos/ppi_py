@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-from ppi_py.utils import reshape_to_2d, construct_weight_vector
-from ppi_py.ppi import (
+from .utils import reshape_to_2d, construct_weight_vector
+from .ppi import (
     ppi_mean_pointestimate, 
     ppi_ols_pointestimate, 
     _ols_get_stats, 
