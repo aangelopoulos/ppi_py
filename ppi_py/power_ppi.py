@@ -13,6 +13,257 @@ from .ppi import (
 
 
 """
+    PPI POWER ANALYSIS
+
+"""
+
+def ppi_power(
+        sigma_sq,
+        rho,
+        cost_Y,
+        cost_Yhat,
+        cost_X,
+        budget = None,
+        se = None
+):
+    """
+    Computes the optimal pair of sample sizes for PPI when the asymptotic variance sigma_sq and the PPI correlation are known.
+
+    Args:
+        sigma_sq (float): Asymptotic variance of the classical point estimate.
+        rho (float): PPI correlation.
+        cost_Y (float): Cost per gold-standard label.
+        cost_Yhat (float): Cost per prediction.
+        budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
+        se (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+
+    Returns:
+        Pandas data frame: containing the following columns
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
+            sigma_sq (float): Asymptotic variance of the classical point estimate.
+            rho (float): PPI correlation.
+
+    Notes:
+        At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
+    """
+    if budget is None and se is None:
+        raise ValueError(
+            "At least one of `budget` and `se` must be provided."
+        )
+    
+    if rho > 1 or rho < -1:
+        raise ValueError(
+            "`rho` must be between -1 and 1."
+        )
+    
+    if sigma_sq <= 0:
+        raise ValueError(
+            "`sigma_sq` must be positive"
+        )
+    
+    if np.shape(rho) == ():
+        rho = np.array([rho])
+
+    if np.shape(sigma_sq) == ():
+        sigma_sq = np.array([sigma_sq])
+
+    gamma, ppi_cost, classical_cost = _get_costs(
+        rho,
+        cost_Y,
+        cost_Yhat,
+        cost_X
+    )
+
+    if budget is not None:
+        return _get_powerful_pair(
+            sigma_sq, 
+            rho, 
+            gamma, 
+            ppi_cost, 
+            classical_cost, 
+            cost_Y,
+            cost_Yhat,
+            cost_X,
+            budget = budget
+        )
+    else:
+        return _get_cheap_pair(
+            sigma_sq,
+            rho,
+            gamma,
+            ppi_cost,
+            classical_cost,
+            cost_Y,
+            cost_Yhat,
+            cost_X,
+            se = se
+        )
+    
+
+def _get_costs(rho,
+               cost_Y,
+               cost_Yhat,
+               cost_X,
+):
+    """
+    Computes the cost of the most efficient PPI and classical estimators per classical sample.
+    
+    Args:
+        rho_sq (ndarray): PPI correlation.
+        cost_Y (float): Cost per gold-standard label.
+        cost_Yhat (float): Cost per prediction.
+        cost_X (float): Cost per unlabeled data point.
+
+    Returns:
+        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
+        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
+        classical_cost (float): Cost of the classical estimator per classical sample.
+    """
+    gamma = (cost_Yhat + cost_X) / cost_Y
+    rho_sq = rho**2
+    ppi_cost = cost_Y * (1 - rho_sq + gamma * rho_sq + 2 * np.sqrt(gamma * rho_sq * (1 - rho_sq)))
+    classical_cost = (cost_Y + cost_X)
+    return gamma, ppi_cost, classical_cost
+    
+def _get_powerful_pair(
+        sigma_sq,
+        rho,
+        gamma,
+        ppi_cost,
+        classical_cost,
+        cost_Y,
+        cost_Yhat,
+        cost_X,
+        budget
+):
+    """
+    Computes the most powerful pair of sample sizes given a budget.
+    
+    Args:
+        sigma_sq (ndarray): Variance of the classical point estimate.
+        rho_sq (ndarray): PPI correlation.
+        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
+        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
+        classical_cost (float): Cost of the classical estimator per classical sample.
+
+    Returns:
+        Pandas data frame: containing the following columns
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
+            sigma_sq (float): Asymptotic variance of the classical point estimate.
+            rho (float): PPI correlation.  
+    """
+    if ppi_cost < classical_cost:
+        n0 = budget / ppi_cost
+        return(_optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X))
+    else:
+        n = budget / classical_cost
+        N = np.zeros_like(n)
+        return(pd.DataFrame({"n" : n, 
+                             "N" : N, 
+                             "cost" : n * classical_cost, 
+                             "se" : (sigma_sq / n)**0.5
+                             }))
+
+def _get_cheap_pair(
+        sigma_sq,
+        rho,
+        gamma,
+        ppi_cost,
+        classical_cost,
+        cost_Y,
+        cost_Yhat,
+        cost_X,
+        se
+):
+    """
+    Computes the most powerful pair of sample sizes given a budget.
+    
+    Args:
+        sigma_sq (ndarray): Variance of the classical point estimate.
+        rho_sq (ndarray): PPI correlation.
+        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
+        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
+        classical_cost (float): Cost of the classical estimator per classical sample
+        se (float): Tolerance for the standard error.
+
+    Returns:
+        Pandas data frame: containing the following columns
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
+            sigma_sq (float): Asymptotic variance of the classical point estimate.
+            rho (float): PPI correlation.   
+    """
+    
+
+    if ppi_cost < classical_cost:
+        n0 = sigma_sq / se**2
+        return(_optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X))
+    else:
+        n = sigma_sq / se**2
+        N = np.zeros_like(n)
+        return(pd.DataFrame({"n" : n, 
+                             "N" : N, 
+                             "cost" : n * classical_cost, 
+                             "se" : (sigma_sq / n)**0.5
+                            }))        
+
+def _optimal_pair(
+        n0,
+        sigma_sq,
+        rho,
+        gamma,
+        cost_Y,
+        cost_Yhat,
+        cost_X
+):
+    """"
+    Compute the optimal pair of PPI samples achieving the same standard error as a classical estimator with n0 samples.
+
+    Args:
+        n0 (float): Number of samples for the classical estimator.
+        sigma_sq (float): Variance of the classical point estimate.
+        rho (float): PPI correlation.
+        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
+        cost_Y (float): Cost per gold-standard label.
+    Returns:
+        Pandas data frame: containing the following columns
+            n (int): Optimal number of gold-labeled samples.
+            N (int): Optimal number of unlabeled samples.
+            cost (float): Total cost.
+            se (float): Estimated standard error of the PPI estimator. 
+            sigma_sq (float): Asymptotic variance of the classical point estimate.
+            rho (float): PPI correlation.        
+    """
+    rho_sq = rho**2
+    n = n0 * (1 - rho_sq + np.sqrt(gamma * rho_sq * (1 - rho_sq)))
+    N = n * (n0 - n) / (n - (1 - rho_sq) * n0)
+
+    n = int(n)
+    N = int(N)
+
+    cost = n * cost_Y + (n + N) * (cost_Yhat + cost_X)
+    se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
+
+
+    return pd.DataFrame({"n": n, 
+                         "N": N, 
+                         "cost": cost, 
+                         "se": se, 
+                         "sigma_sq": sigma_sq, 
+                         "rho": rho
+                         })
+
+
+
+"""
     MEAN POWER CALCULATION
 
 """
@@ -24,7 +275,7 @@ def ppi_mean_power(
         cost_Y,
         cost_Yhat,
         budget=None,
-        se_tol=None,
+        se=None,
         w=None,
         w_unlabeled=None     
 ):
@@ -35,10 +286,10 @@ def ppi_mean_power(
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        cost_Y (float) : Cost per gold-standard label.
+        cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
-        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        se (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
@@ -49,14 +300,14 @@ def ppi_mean_power(
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator. 
             sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.
+            rho (float): PPI correlation.
 
     Notes:
-        At least one of `budget` and `se_tol` must be provided. If both are provided, `budget` will be used.
+        At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
     """
-    if budget is None and se_tol is None:
+    if budget is None and se is None:
         raise ValueError(
-            "At least one of `budget` and `se_tol` must be provided."
+            "At least one of `budget` and `se` must be provided."
         )
     if len(Y.shape) > 1 and Y.shape[1] > 1:
         raise ValueError("Y must be a 1D array.")
@@ -88,45 +339,20 @@ def ppi_mean_power(
     grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
     inv_hessian = np.eye(d) 
 
-    sigma_sq, rho_sq = _get_power_analysis_params(
+    sigma_sq, rho = _get_power_analysis_params(
         grads,
         grads_hat,
         grads_hat_unlabeled,
         inv_hessian
     )
 
-    gamma, ppi_cost, classical_cost = _get_costs(
-        rho_sq,
-        cost_Y,
-        cost_Yhat,
-        cost_X = 0
-    )
-
-    if budget is not None:
-        return _get_powerful_pair(
-            sigma_sq, 
-            rho_sq, 
-            gamma, 
-            ppi_cost, 
-            classical_cost, 
-            cost_Y,
-            cost_Yhat,
-            cost_X = 0,
-            budget = budget
-        )
-    else:
-        return _get_cheap_pair(
-            sigma_sq,
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost,
-            cost_Y,
-            cost_Yhat,
-            cost_X = 0,
-            se_tol = se_tol
-        )
-
+    return ppi_power(sigma_sq,
+                     rho,
+                     cost_Y,
+                     cost_Yhat,
+                     cost_X = 0,
+                     budget = budget,
+                     se = se)
 
 
 def _get_power_analysis_params(
@@ -174,8 +400,8 @@ def _get_power_analysis_params(
 
     sigma_sq = np.diag(inv_hessian @ var_grads @ inv_hessian)
 
-    num = np.diag(inv_hessian @ cov_grads @ inv_hessian)**2
-    denom = sigma_sq * np.diag(inv_hessian @ var_grads_hat @ inv_hessian)
+    num = np.diag(inv_hessian @ cov_grads @ inv_hessian)
+    denom = np.sqrt(sigma_sq * np.diag(inv_hessian @ var_grads_hat @ inv_hessian))
     rho_sq = num / denom
     rho_sq = np.minimum(rho_sq, 1-1/n)
 
@@ -184,162 +410,7 @@ def _get_power_analysis_params(
     else:
         return sigma_sq, rho_sq
 
-def _get_costs(rho_sq,
-               cost_Y,
-               cost_Yhat,
-               cost_X,
-):
-    """
-    Computes the cost of the most efficient PPI and classical estimators per classical sample.
-    
-    Args:
-        rho_sq (ndarray): PPI correlation.
-        cost_Y (float): Cost per gold-standard label.
-        cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
 
-    Returns:
-        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
-        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
-        classical_cost (float): Cost of the classical estimator per classical sample.
-    """
-    gamma = (cost_Yhat + cost_X) / cost_Y
-    ppi_cost = cost_Y * (1 - rho_sq + gamma * rho_sq + 2 * np.sqrt(gamma * rho_sq * (1 - rho_sq)))
-    classical_cost = (cost_Y + cost_X)
-    return gamma, ppi_cost, classical_cost
-    
-def _get_powerful_pair(
-        sigma_sq,
-        rho_sq,
-        gamma,
-        ppi_cost,
-        classical_cost,
-        cost_Y,
-        cost_Yhat,
-        cost_X,
-        budget
-):
-    """
-    Computes the most powerful pair of sample sizes given a budget.
-    
-    Args:
-        sigma_sq (ndarray): Variance of the classical point estimate.
-        rho_sq (ndarray): PPI correlation.
-        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
-        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
-        classical_cost (float): Cost of the classical estimator per classical sample.
-
-    Returns:
-        Pandas data frame: containing the following columns
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            se (float): Estimated standard error of the PPI estimator. 
-            sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.  
-    """
-    if ppi_cost < classical_cost:
-        n0 = budget / ppi_cost
-        return(_optimal_pair(n0, sigma_sq, rho_sq, gamma, cost_Y, cost_Yhat, cost_X))
-    else:
-        n = budget / classical_cost
-        N = np.zeros_like(n)
-        return(pd.DataFrame({"n" : n, 
-                             "N" : N, 
-                             "cost" : n * classical_cost, 
-                             "se" : (sigma_sq / n)**0.5
-                             }))
-
-
-def _get_cheap_pair(
-        sigma_sq,
-        rho_sq,
-        gamma,
-        ppi_cost,
-        classical_cost,
-        cost_Y,
-        cost_Yhat,
-        cost_X,
-        se_tol
-):
-    """
-    Computes the most powerful pair of sample sizes given a budget.
-    
-    Args:
-        sigma_sq (ndarray): Variance of the classical point estimate.
-        rho_sq (ndarray): PPI correlation.
-        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
-        ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
-        classical_cost (float): Cost of the classical estimator per classical sample
-        se_tol (float): Tolerance for the standard error.
-
-    Returns:
-        Pandas data frame: containing the following columns
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            se (float): Estimated standard error of the PPI estimator. 
-            sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.   
-    """
-    
-
-    if ppi_cost < classical_cost:
-        n0 = sigma_sq / se_tol**2
-        return(_optimal_pair(n0, sigma_sq, rho_sq, gamma, cost_Y, cost_Yhat, cost_X))
-    else:
-        n = sigma_sq / se_tol**2
-        N = np.zeros_like(n)
-        return(pd.DataFrame({"n" : n, 
-                             "N" : N, 
-                             "cost" : n * classical_cost, 
-                             "se" : (sigma_sq / n)**0.5
-                            }))
-
-            
-
-def _optimal_pair(
-        n0,
-        sigma_sq,
-        rho_sq,
-        gamma,
-        cost_Y,
-        cost_Yhat,
-        cost_X
-):
-    """"
-    Compute the optimal pair of PPI samples achieving the same standard error as a classical estimator with n0 samples.
-
-    Args:
-        n0 (float): Number of samples for the classical estimator.
-        sigma_sq (float): Variance of the classical point estimate.
-        rho_sq (float): PPI correlation squared.
-        gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
-        cost_Y (float): Cost per gold-standard label.
-    Returns:
-        Pandas data frame: containing the following columns
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            se (float): Estimated standard error of the PPI estimator. 
-            sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.        
-    """
-    n = n0 * (1 - rho_sq + np.sqrt(gamma * rho_sq * (1 - rho_sq)))
-    N = n * (n0 - n) / (n - (1 - rho_sq) * n0)
-    n = n.astype(int)
-    N = N.astype(int)
-
-    cost = n * cost_Y + (n + N) * (cost_Yhat + cost_X)
-    se = np.sqrt(sigma_sq / n)*np.sqrt(1 - rho_sq * N/(n + N))
-
-    return pd.DataFrame({"n": n, 
-                         "N": N, 
-                         "cost": cost, 
-                         "se": se, 
-                         "sigma_sq": sigma_sq, 
-                         "rho_sq": rho_sq
-                         })
 
 """
     ORDINARY LEAST SQUARES POWER CALCULATION
@@ -358,7 +429,7 @@ def ppi_ols_power(
     cost_X,
     coord,
     budget=None,
-    se_tol=None,
+    se=None,
     w=None,
     w_unlabeled=None, 
 ):
@@ -376,7 +447,7 @@ def ppi_ols_power(
         cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
-        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        se (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -387,14 +458,14 @@ def ppi_ols_power(
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator. 
             sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.
+            rho (float): PPI correlation.
     
     Notes:
-        At least one of `budget` and `se_tol` must be provided. If both are provided, `budget` will be used.
+        At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used.
     """
-    if budget is None and se_tol is None:
+    if budget is None and se is None:
         raise ValueError(
-            "At least one of `budget` and `se_tol` must be provided."
+            "At least one of `budget` and `se` must be provided."
         )
     
     ppi_pointest = ppi_ols_pointestimate(
@@ -418,7 +489,7 @@ def ppi_ols_power(
         w_unlabeled=w_unlabeled
     )
 
-    sigma_sq, rho_sq = _get_power_analysis_params(
+    sigma_sq, rho = _get_power_analysis_params(
         grads,
         grads_hat,
         grads_hat_unlabeled,
@@ -426,38 +497,13 @@ def ppi_ols_power(
         coord=coord
     )
 
-
-    gamma, ppi_cost, classical_cost = _get_costs(
-        rho_sq,
-        cost_Y,
-        cost_Yhat,
-        cost_X
-    )
-
-    if budget is not None:
-        return _get_powerful_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            budget
-        )
-    else:
-        return _get_cheap_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            se_tol
-        )
+    return ppi_power(sigma_sq,
+                     rho,
+                     cost_Y,
+                     cost_Yhat,
+                     cost_X,
+                     budget,
+                     se)
 
 """
     LOGISTIC REGRESSION POWER CALCULATION
@@ -474,7 +520,7 @@ def ppi_logistic_power(
     cost_X,
     coord,
     budget=None,
-    se_tol=None,
+    se=None,
     w=None,
     w_unlabeled=None, 
 ):
@@ -492,7 +538,7 @@ def ppi_logistic_power(
         cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
-        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        se (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
@@ -503,14 +549,14 @@ def ppi_logistic_power(
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator. 
             sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.
+            rho (float): PPI correlation.
     
     Notes:
-        At least one of `budget` and `se_tol` must be provided. If both are provided, `budget` will be used.
+        At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used.
     """
-    if budget is None and se_tol is None:
+    if budget is None and se is None:
         raise ValueError(
-            "At least one of `budget` and `se_tol` must be provided."
+            "At least one of `budget` and `se` must be provided."
         )
     
     ppi_pointest = ppi_logistic_pointestimate(
@@ -534,7 +580,7 @@ def ppi_logistic_power(
         w_unlabeled=w_unlabeled
     )
 
-    sigma_sq, rho_sq = _get_power_analysis_params(
+    sigma_sq, rho = _get_power_analysis_params(
         grads,
         grads_hat,
         grads_hat_unlabeled,
@@ -542,37 +588,13 @@ def ppi_logistic_power(
         coord=coord
     )
 
-    gamma, ppi_cost, classical_cost = _get_costs(
-        rho_sq,
-        cost_Y,
-        cost_Yhat,
-        cost_X
-    )
-
-    if budget is not None:
-        return _get_powerful_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            budget
-        )
-    else:
-        return _get_cheap_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            se_tol
-        )
+    return ppi_power(sigma_sq,
+                     rho,
+                     cost_Y,
+                     cost_Yhat,
+                     cost_X,
+                     budget,
+                     se)
     
 """
     POISSON REGRESSION POWER CALCULATION
@@ -589,7 +611,7 @@ def ppi_poisson_power(
         cost_X,
         coord,
         budget=None,
-        se_tol=None,
+        se=None,
         w=None,
         w_unlabeled=None,
 ):
@@ -607,7 +629,7 @@ def ppi_poisson_power(
         cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
-        se_tol (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
+        se (float, optional): Tolerance for the standard error. Used to compute the cheapest pair achieving a desired standard error.
         w (ndarray, optional): Sample weights for the labeled data set.
         w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
         
@@ -618,11 +640,11 @@ def ppi_poisson_power(
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator. 
             sigma_sq (float): Asymptotic variance of the classical point estimate.
-            rho_sq (float): PPI correlation squared.
+            rho (float): PPI correlation.
     """
-    if budget is None and se_tol is None:
+    if budget is None and se is None:
         raise ValueError(
-            "At least one of `budget` and `se_tol` must be provided."
+            "At least one of `budget` and `se` must be provided."
         )
 
     ppi_pointest = ppi_poisson_pointestimate(
@@ -646,7 +668,7 @@ def ppi_poisson_power(
         w_unlabeled=w_unlabeled
     )
 
-    sigma_sq, rho_sq = _get_power_analysis_params(
+    sigma_sq, rho = _get_power_analysis_params(
         grads,
         grads_hat,
         grads_hat_unlabeled,
@@ -654,34 +676,10 @@ def ppi_poisson_power(
         coord=coord
     )
 
-    gamma, ppi_cost, classical_cost = _get_costs(
-        rho_sq,
-        cost_Y,
-        cost_Yhat,
-        cost_X
-    )
-
-    if budget is not None:
-        return _get_powerful_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            budget
-        )
-    else:
-        return _get_cheap_pair(
-            sigma_sq, 
-            rho_sq,
-            gamma,
-            ppi_cost,
-            classical_cost, 
-            cost_Y, 
-            cost_Yhat, 
-            cost_X, 
-            se_tol
-        )    
+    return ppi_power(sigma_sq,
+                     rho,
+                     cost_Y,
+                     cost_Yhat,
+                     cost_X,
+                     budget,
+                     se)   
