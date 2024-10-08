@@ -113,7 +113,7 @@ def _get_costs(rho,
     Computes the cost of the most efficient PPI and classical estimators per classical sample.
     
     Args:
-        rho_sq (ndarray): PPI correlation.
+        rho (ndarray): PPI correlation.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
         cost_X (float): Cost per unlabeled data point.
@@ -241,6 +241,9 @@ def _get_cheap_pair(
             se (float): Estimated standard error of the PPI estimator. 
             rho (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
+
+    Notes:
+        If sigma_sq / n_max > se**2, then there is no pair of sample sizes (n, N) with n + N <= n_max that has a standard error of se or smaller. In this case, the function will give a warning and will return n = n_max and N = 0. This is the most powerful pair of sample sizes that can be achieved with n_max unlabeled samples.
     """
     
 
