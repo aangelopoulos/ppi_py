@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import warnings
 from .utils import reshape_to_2d, construct_weight_vector
 from .ppi import (
     ppi_mean_pointestimate, 
@@ -251,7 +252,9 @@ def _get_cheap_pair(
         result = {"n" : n, 
                 "N" : 0, 
                 "cost" : n * classical_cost, 
-                "se" : (sigma_sq / n)**0.5}
+                "se" : (sigma_sq / n)**0.5,
+                "rho" : rho,
+                "effective_n" : n}
 
     if n_max is None:
         return result
@@ -259,7 +262,15 @@ def _get_cheap_pair(
         return result
     
     if sigma_sq / n_max > se**2:
-        raise Exception("No pair of sample sizes achieves the desired standard error with n + N <= n_max. Increase n_max or decrease se.")
+        warnings.warn("The desired standard error is too small for the given number of unlabeled samples. Returning n = n_max and N = 0. To achieve the desired standard error, increase n_max or decrease se.", UserWarning)
+        n = n_max
+        return {"n" : n, 
+                "N" : 0, 
+                "cost" : n * classical_cost, 
+                "se" : (sigma_sq / n)**0.5,
+                "rho" : rho,
+                "effective_n" : n}
+
     
     n = n_max * sigma_sq * (1 - rho**2) / (n_max * se**2 - rho**2 * sigma_sq)
     n = int(n)
