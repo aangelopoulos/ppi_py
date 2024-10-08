@@ -265,27 +265,28 @@ def _get_cheap_pair(
         return result
     
     if sigma_sq / n_max > se**2:
-        warnings.warn("The desired standard error is too small for the given number of unlabeled samples. Returning n = n_max and N = 0. To achieve the desired standard error, increase n_max or decrease se.", UserWarning)
+        warnings.warn("The desired standard error is too small for the given number of unlabeled samples. \nReturning n = n_max and N = 0. To achieve the desired standard error, increase n_max or decrease se.", UserWarning)
+
         n = n_max
         return {"n" : n, 
                 "N" : 0, 
                 "cost" : n * classical_cost, 
                 "se" : (sigma_sq / n)**0.5,
                 "rho" : rho,
-                "effective_n" : n}
+                "effective_n" : n
+                }
 
-    
-    n = n_max * sigma_sq * (1 - rho**2) / (n_max * se**2 - rho**2 * sigma_sq)
-    n = int(n)
-    N = n_max - n
-    se = (sigma_sq / n * (1 - rho**2 * N/(n + N)))**0.5
-    return {"n" : n,
-            "N" : N,
-            "cost" : n * (cost_Y + cost_Yhat + cost_X) + N * (cost_Yhat + cost_X),
-            "se" : se,
-            "rho" : rho,
-            "effective_n" : int(sigma_sq / se**2)
-            }
+    else:
+        n = int(n_max * sigma_sq * (1 - rho**2) / (n_max * se**2 - rho**2 * sigma_sq))
+        N = n_max - n
+        se = (sigma_sq / n * (1 - rho**2 * N/(n + N)))**0.5
+        return {"n" : n,
+                "N" : N,
+                "cost" : n * (cost_Y + cost_Yhat + cost_X) + N * (cost_Yhat + cost_X),
+                "se" : se,
+                "rho" : rho,
+                "effective_n" : int(sigma_sq / se**2)
+                }
 
 
 def _optimal_pair(
@@ -445,11 +446,11 @@ def _get_power_analysis_params(
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
         grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int, optional): Coordinate for which to optimize `lam`, when `optim_mode="overall"`. If `None`, it optimizes the total variance  over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        coord (int, optional): Coordinate for regression coefficients. Must be in {1, ..., d} where d is the shape of the estimand.
 
     Returns:
-        float or ndarray: Variance of the classical point estimate.
-        float or ndarray: PPI correlation
+        float: Variance of the classical point estimate.
+        float: PPI correlation
     """
     grads = reshape_to_2d(grads)
     grads_hat = reshape_to_2d(grads_hat)
