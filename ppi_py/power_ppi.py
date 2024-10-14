@@ -165,10 +165,11 @@ def _get_powerful_pair(
             rho (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
     """
-    if ppi_cost < classical_cost:
-        n0 = budget / ppi_cost
-        result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X) 
-    else:
+
+    n0 = budget / ppi_cost
+    result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X)
+
+    if classical_cost < ppi_cost or result["N"] < 0:
         n = int(budget / classical_cost)
         result = {"n" : n, 
                 "N" : 0, 
@@ -247,10 +248,10 @@ def _get_cheap_pair(
     """
     
 
-    if ppi_cost < classical_cost:
-        n0 = sigma_sq / se**2
-        result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X)
-    else:
+    n0 = sigma_sq / se**2
+    result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X)
+    
+    if classical_cost < ppi_cost or result["N"] < 0:
         n = int(sigma_sq / se**2)
         result = {"n" : n, 
                 "N" : 0, 
