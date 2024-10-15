@@ -241,7 +241,7 @@ def test_ppi_poweranalysis_cheapest3():
     Power analysis for mean estimation
 """
 
-def simulate_ses(n_star, N_star, rho_0, reps = 100):
+def simulate_ses_mean(n_star, N_star, rho_0, reps = 100):
     ses = np.zeros(reps)
     if N_star == 0:
         for i in range(reps):
@@ -258,7 +258,7 @@ def simulate_ses(n_star, N_star, rho_0, reps = 100):
             Yhat = rho_0**0.5*Z1 + (1 - rho_0)**0.5*Z3
             Yhat_unlabelled = np.random.normal(0, 1, N_star)
             CI = ppi_mean_ci(Y, Yhat, Yhat_unlabelled, 0.05)
-            ses[i] = (CI[1] - CI[0])/(2*norm.ppf(0.975))
+            ses[i] = (CI[1][0] - CI[0][0])/(2*norm.ppf(0.975))
 
     return ses
 
@@ -297,7 +297,7 @@ def test_ppi_poweranalysis_mean():
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses(powerful_pair["n"], powerful_pair["N"], rho_0)
+    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], rho_0)
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
 
@@ -343,7 +343,7 @@ def test_ppi_poweranalysis_mean2():
     assert powerful_pair["N"] == 0, powerful_pair["N"]
 
     ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses(powerful_pair["n"], powerful_pair["N"], rho_0)
+    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], rho_0)
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
 
@@ -532,6 +532,7 @@ def simulate_se_poisson(n_star, N_star, rho_0, beta, coord, reps = 100):
 
     return ses
 
+
 def simulate_poisson_model(n_star, N_star, rho_0, beta):
     d = len(beta)
 
@@ -598,7 +599,7 @@ def test_ppi_poweranalysis_poisson():
 """
 
 
-reps = 100
+reps = 10
 for i in tqdm(range(reps)):
     test_ppi_poweranalysis_powerful()
     test_ppi_poweranalysis_powerful2()
