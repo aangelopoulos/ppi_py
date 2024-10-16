@@ -13,19 +13,19 @@ from scipy.special import expit
 """
 
 
-def ppi_se(sigma_sq, rho, n, N):
-    return np.sqrt(sigma_sq / n * (1 - rho**2 * N / (n + N)))
+def ppi_se(sigma_sq, ppi_corr, n, N):
+    return np.sqrt(sigma_sq / n * (1 - ppi_corr**2 * N / (n + N)))
 
 
 def check_optimality(
-    result, cost_Y, cost_Yhat, cost_X, epsilon=0.01, n_max=np.inf
+    result, cost_X, cost_Y, cost_Yhat, epsilon=0.01, n_max=np.inf
 ):
     n_star = result["n"]
     N_star = result["N"]
     cost = result["cost"]
-    rho = result["rho"]
+    ppi_corr = result["ppi_corr"]
 
-    se_star = ppi_se(1, rho, n_star, N_star)
+    se_star = ppi_se(1, ppi_corr, n_star, N_star)
     n_upper = np.min([2 * n_star, n_max])
     n_upper = int(n_upper)
     ns = np.arange(1, n_upper + 1)
@@ -37,7 +37,7 @@ def check_optimality(
     ns = ns[valid]
     Ns = Ns[valid]
     Ns = Ns.astype(int)
-    ses = ppi_se(1, rho, ns, Ns)
+    ses = ppi_se(1, ppi_corr, ns, Ns)
 
     if N_star > 0:
         optimal = np.abs(se_star - ses.min()) < epsilon * se_star
@@ -46,9 +46,9 @@ def check_optimality(
     return optimal
 
 
-## Test with high rho, low costs of unlabeled data
+## Test with high ppi_corr, low costs of unlabeled data
 def test_ppi_poweranalysis_powerful():
-    rho = np.random.uniform(0.8, 0.9)
+    ppi_corr = np.random.uniform(0.8, 0.9)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -59,7 +59,7 @@ def test_ppi_poweranalysis_powerful():
     budget = 1000
 
     powerful_pair = ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget=budget
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -71,16 +71,16 @@ def test_ppi_poweranalysis_powerful():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
 
-## Test with low rho, high costs of unlabeled data
+## Test with low ppi_corr, high costs of unlabeled data
 
 
 def test_ppi_poweranalysis_powerful2():
-    rho = np.random.uniform(0.1, 0.2)
+    ppi_corr = np.random.uniform(0.1, 0.2)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -91,7 +91,7 @@ def test_ppi_poweranalysis_powerful2():
     budget = 1000
 
     powerful_pair = ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget=budget
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -106,14 +106,14 @@ def test_ppi_poweranalysis_powerful2():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
 
 # Test n_max constraint
 def test_ppi_poweranalysis_powerful3():
-    rho = np.random.uniform(0.8, 0.9)
+    ppi_corr = np.random.uniform(0.8, 0.9)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -124,7 +124,7 @@ def test_ppi_poweranalysis_powerful3():
     n_max = 1500
 
     powerful_pair = ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget=budget, n_max=n_max
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget, n_max=n_max
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -141,7 +141,7 @@ def test_ppi_poweranalysis_powerful3():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon, n_max
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon, n_max
     )
     assert optimal
 
@@ -151,9 +151,9 @@ def test_ppi_poweranalysis_powerful3():
 """
 
 
-# Test with high rho
+# Test with high ppi_corr
 def test_ppi_poweranalysis_cheapest():
-    rho = np.random.uniform(0.8, 0.9)
+    ppi_corr = np.random.uniform(0.8, 0.9)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -163,7 +163,7 @@ def test_ppi_poweranalysis_cheapest():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(sigma_sq, rho, cost_Y, cost_Yhat, cost_X, se=se)
+    cheapest_pair = ppi_power(sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se)
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -180,14 +180,14 @@ def test_ppi_poweranalysis_cheapest():
 
     # Check optimality of the cheapest pair
     optimal = check_optimality(
-        cheapest_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
 
-# Test with low rho
+# Test with low ppi_corr
 def test_ppi_poweranalysis_cheapest2():
-    rho = np.random.uniform(0, 0.2)
+    ppi_corr = np.random.uniform(0, 0.2)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -197,7 +197,7 @@ def test_ppi_poweranalysis_cheapest2():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(sigma_sq, rho, cost_Y, cost_Yhat, cost_X, se=se)
+    cheapest_pair = ppi_power(sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se)
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -214,14 +214,14 @@ def test_ppi_poweranalysis_cheapest2():
 
     # Check optimality of the cheapest pair
     optimal = check_optimality(
-        cheapest_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
 
 # Check n_max constraint
 def test_ppi_poweranalysis_cheapest3():
-    rho = np.random.uniform(0.8, 0.9)
+    ppi_corr = np.random.uniform(0.8, 0.9)
     sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
@@ -233,7 +233,7 @@ def test_ppi_poweranalysis_cheapest3():
     n_max = 15000
 
     cheapest_pair = ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, se=se, n_max=n_max
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se, n_max=n_max
     )
 
     # Check if the cheapest pair achieves the desired se
@@ -256,7 +256,7 @@ def test_ppi_poweranalysis_cheapest3():
 
     # Check optimality of the cheapest pair
     optimal = check_optimality(
-        cheapest_pair, cost_Y, cost_Yhat, cost_X, epsilon, n_max
+        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon, n_max
     )
     assert optimal
 
@@ -266,7 +266,7 @@ def test_ppi_poweranalysis_cheapest3():
 """
 
 
-def simulate_ses_mean(n_star, N_star, rho_0, reps=100):
+def simulate_ses_mean(n_star, N_star, ppi_corr_0, reps=100):
     ses = np.zeros(reps)
     if N_star == 0:
         for i in range(reps):
@@ -279,8 +279,8 @@ def simulate_ses_mean(n_star, N_star, rho_0, reps=100):
             Z2 = np.random.normal(0, 1, n_star)
             Z3 = np.random.normal(0, 1, n_star)
 
-            Y = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z2
-            Yhat = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z3
+            Y = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
+            Yhat = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
             Yhat_unlabelled = np.random.normal(0, 1, N_star)
             CI = ppi_mean_ci(Y, Yhat, Yhat_unlabelled, 0.05)
             ses[i] = (CI[1][0] - CI[0][0]) / (2 * norm.ppf(0.975))
@@ -288,15 +288,15 @@ def simulate_ses_mean(n_star, N_star, rho_0, reps=100):
     return ses
 
 
-## Test with high rho
+## Test with high ppi_corr
 def test_ppi_poweranalysis_mean():
-    rho_0 = np.random.uniform(0.8, 0.9)
+    ppi_corr_0 = np.random.uniform(0.8, 0.9)
     Z1 = np.random.normal(0, 1, 1000)
     Z2 = np.random.normal(0, 1, 1000)
     Z3 = np.random.normal(0, 1, 1000)
 
-    Y = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z2
-    Yhat = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z3
+    Y = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
+    Yhat = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
     Yhat_unlabelled = np.random.normal(0, 1, 1)
 
     cost_Y = 1
@@ -318,11 +318,11 @@ def test_ppi_poweranalysis_mean():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(powerful_pair, cost_Y, cost_Yhat, 0, epsilon)
+    optimal = check_optimality(powerful_pair, cost_X = 0, cost_Y = cost_Y, cost_Yhat = cost_Yhat, epsilon = epsilon)
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], rho_0)
+    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0)
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
 
@@ -330,15 +330,15 @@ def test_ppi_poweranalysis_mean():
     assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
 
 
-## Test with low rho
+## Test with low ppi_corr
 def test_ppi_poweranalysis_mean2():
-    rho_0 = np.random.uniform(0.1, 0.2)
+    ppi_corr_0 = np.random.uniform(0.1, 0.2)
     Z1 = np.random.normal(0, 1, 1000)
     Z2 = np.random.normal(0, 1, 1000)
     Z3 = np.random.normal(0, 1, 1000)
 
-    Y = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z2
-    Yhat = rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z3
+    Y = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
+    Yhat = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
     Yhat_unlabelled = np.random.normal(0, 1, 1)
 
     cost_Y = 1
@@ -367,7 +367,7 @@ def test_ppi_poweranalysis_mean2():
     assert powerful_pair["N"] == 0, powerful_pair["N"]
 
     ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], rho_0)
+    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0)
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
 
@@ -380,13 +380,13 @@ def test_ppi_poweranalysis_mean2():
 """
 
 
-def simulate_ses_OLS(n_star, N_star, rho_0, beta, coord, reps=100):
+def simulate_ses_OLS(n_star, N_star, ppi_corr_0, beta, coord, reps=100):
 
     ses = np.zeros(reps)
     if N_star > 0:
         for i in range(reps):
             X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_linear_model(
-                n_star, N_star, rho_0, beta
+                n_star, N_star, ppi_corr_0, beta
             )
             CI = ppi_ols_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, 0.05)
             ses[i] = np.linalg.norm(CI[1][coord] - CI[0][coord]) / (
@@ -394,14 +394,14 @@ def simulate_ses_OLS(n_star, N_star, rho_0, beta, coord, reps=100):
             )
     else:
         for i in range(reps):
-            X, Y, _, _, _ = simulate_linear_model(n_star, N_star, rho_0, beta)
+            X, Y, _, _, _ = simulate_linear_model(n_star, N_star, ppi_corr_0, beta)
             CI = classical_ols_ci(X, Y, alpha=0.05)
             ses[i] = (CI[1][coord] - CI[0][coord]) / (2 * norm.ppf(0.975))
 
     return ses
 
 
-def simulate_linear_model(n_star, N_star, rho_0, beta):
+def simulate_linear_model(n_star, N_star, ppi_corr_0, beta):
     d = len(beta)
     X = np.random.normal(0, 1, (n_star, d))
     X_unlabeled = np.random.normal(0, 1, (N_star, d))
@@ -410,14 +410,14 @@ def simulate_linear_model(n_star, N_star, rho_0, beta):
     Z2 = np.random.normal(0, 1, n_star)
     Z3 = np.random.normal(0, 1, n_star)
 
-    Y = X @ beta + rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z2
-    Yhat = X @ beta + rho_0**0.5 * Z1 + (1 - rho_0) ** 0.5 * Z3
+    Y = X @ beta + ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
+    Yhat = X @ beta + ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
     Yhat_unlabeled = X_unlabeled @ beta + np.random.normal(0, 1, N_star)
     return X, Y, Yhat, X_unlabeled, Yhat_unlabeled
 
 
 def test_ppi_poweranalysis_OLS():
-    rho_0 = np.random.uniform(0, 1)
+    ppi_corr_0 = np.random.uniform(0, 1)
     d = 3
     beta = np.random.uniform(-1, 1, d)
     coord = 0
@@ -429,7 +429,7 @@ def test_ppi_poweranalysis_OLS():
     epsilon = 0.02
 
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_linear_model(
-        5000, 5000, rho_0, beta
+        5000, 5000, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_ols_power(
@@ -454,13 +454,13 @@ def test_ppi_poweranalysis_OLS():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
     ses = simulate_ses_OLS(
-        powerful_pair["n"], powerful_pair["N"], rho_0, beta, coord
+        powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
@@ -476,13 +476,13 @@ test_ppi_poweranalysis_OLS()
 """
 
 
-def simulate_se_logisitic(n_star, N_star, rho_0, beta, coord, reps=100):
+def simulate_se_logisitic(n_star, N_star, ppi_corr_0, beta, coord, reps=100):
     ses = np.zeros(reps)
 
     if N_star > 0:
         for i in range(reps):
             X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_logistic_model(
-                n_star, N_star, rho_0, beta
+                n_star, N_star, ppi_corr_0, beta
             )
             CI = ppi_logistic_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, 0.05)
             ses[i] = np.linalg.norm(CI[1][coord] - CI[0][coord]) / (
@@ -491,7 +491,7 @@ def simulate_se_logisitic(n_star, N_star, rho_0, beta, coord, reps=100):
     else:
         for i in range(reps):
             X, Y, _, _, _ = simulate_logistic_model(
-                n_star, N_star, rho_0, beta
+                n_star, N_star, ppi_corr_0, beta
             )
             CI = classical_logistic_ci(X, Y, alpha=0.05)
             ses[i] = (CI[1][coord] - CI[0][coord]) / (2 * norm.ppf(0.975))
@@ -499,9 +499,9 @@ def simulate_se_logisitic(n_star, N_star, rho_0, beta, coord, reps=100):
     return ses
 
 
-def simulate_logistic_model(n_star, N_star, rho_0, beta):
+def simulate_logistic_model(n_star, N_star, ppi_corr_0, beta):
     d = len(beta)
-    p = 1 - rho_0**2
+    p = 1 - ppi_corr_0**2
     X = np.random.normal(0, 1, (n_star, d))
     X_unlabeled = np.random.normal(0, 1, (N_star, d))
 
@@ -520,7 +520,7 @@ def simulate_logistic_model(n_star, N_star, rho_0, beta):
 
 
 def test_ppi_poweranalysis_logistic():
-    rho_0 = np.random.uniform(0.1, 0.9)
+    ppi_corr_0 = np.random.uniform(0.1, 0.9)
     d = 3
     beta = np.random.uniform(-1, 1, d)
     coord = 0
@@ -532,7 +532,7 @@ def test_ppi_poweranalysis_logistic():
     epsilon = 0.02
 
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_logistic_model(
-        10000, 10000, rho_0, beta
+        10000, 10000, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_logistic_power(
@@ -541,9 +541,9 @@ def test_ppi_poweranalysis_logistic():
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
+        cost_X,
         cost_Y,
         cost_Yhat,
-        cost_X,
         coord,
         budget=budget,
     )
@@ -557,13 +557,13 @@ def test_ppi_poweranalysis_logistic():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
     ses = simulate_se_logisitic(
-        powerful_pair["n"], powerful_pair["N"], rho_0, beta, coord
+        powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
     se_star = powerful_pair["se"]
     se_sim = ses.mean()
@@ -577,12 +577,12 @@ def test_ppi_poweranalysis_logistic():
 """
 
 
-def simulate_se_poisson(n_star, N_star, rho_0, beta, coord, reps=100):
+def simulate_se_poisson(n_star, N_star, ppi_corr_0, beta, coord, reps=100):
     ses = np.zeros(reps)
     if N_star > 0:
         for i in range(reps):
             X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_poisson_model(
-                n_star, N_star, rho_0, beta
+                n_star, N_star, ppi_corr_0, beta
             )
             CI = ppi_poisson_ci(X, Y, Yhat, X_unlabeled, Yhat_unlabeled, 0.05)
             ses[i] = np.linalg.norm(CI[1][coord] - CI[0][coord]) / (
@@ -591,7 +591,7 @@ def simulate_se_poisson(n_star, N_star, rho_0, beta, coord, reps=100):
     else:
         for i in range(reps):
             X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_poisson_model(
-                n_star, N_star, rho_0, beta
+                n_star, N_star, ppi_corr_0, beta
             )
             CI = classical_poisson_ci(X, Y, alpha=0.05)
             ses[i] = (CI[1][coord] - CI[0][coord]) / (2 * norm.ppf(0.975))
@@ -599,14 +599,14 @@ def simulate_se_poisson(n_star, N_star, rho_0, beta, coord, reps=100):
     return ses
 
 
-def simulate_poisson_model(n_star, N_star, rho_0, beta):
+def simulate_poisson_model(n_star, N_star, ppi_corr_0, beta):
     d = len(beta)
 
     X = np.random.normal(0, 1, (n_star, d)) / np.sqrt(d)
     X_unlabeled = np.random.normal(0, 1, (N_star, d)) / np.sqrt(d)
     Y = np.random.poisson(np.exp(X @ beta))
 
-    c = (1 - rho_0**2) / rho_0**2
+    c = (1 - ppi_corr_0**2) / ppi_corr_0**2
     Z = np.random.poisson(c * np.exp(X @ beta))
     Yhat = Y + Z
 
@@ -618,7 +618,7 @@ def simulate_poisson_model(n_star, N_star, rho_0, beta):
 
 
 def test_ppi_poweranalysis_poisson():
-    rho_0 = np.random.uniform(0.1, 0.9)
+    ppi_corr_0 = np.random.uniform(0.1, 0.9)
     d = 3
     beta = np.random.uniform(-1, 1, d)
     coord = 0
@@ -630,7 +630,7 @@ def test_ppi_poweranalysis_poisson():
     epsilon = 0.02
 
     X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_poisson_model(
-        10000, 10000, rho_0, beta
+        10000, 10000, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_poisson_power(
@@ -639,9 +639,9 @@ def test_ppi_poweranalysis_poisson():
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
+        cost_X,
         cost_Y,
         cost_Yhat,
-        cost_X,
         coord,
         budget=budget,
     )
@@ -655,13 +655,13 @@ def test_ppi_poweranalysis_poisson():
 
     ## Check optimality of the most powerful pair
     optimal = check_optimality(
-        powerful_pair, cost_Y, cost_Yhat, cost_X, epsilon
+        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
     ses = simulate_se_poisson(
-        powerful_pair["n"], powerful_pair["N"], rho_0, beta, coord
+        powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
     se_star = powerful_pair["se"]
     se_sim = ses.mean()

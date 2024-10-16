@@ -19,14 +19,14 @@ from .ppi import (
 
 
 def ppi_power(
-    sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget=None, se=None, n_max=None
+    sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=None, se=None, n_max=None
 ):
     """
     Computes the optimal pair of sample sizes for PPI when the asymptotic variance sigma_sq and the PPI correlation are known.
 
     Args:
         sigma_sq (float): Asymptotic variance of the classical point estimate.
-        rho (float): PPI correlation as defined in [BHvL24].
+        ppi_corr (float): PPI correlation as defined in [BHvL24].
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
         cost_X (float): Cost per unlabeled data point.
@@ -40,7 +40,7 @@ def ppi_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -49,55 +49,55 @@ def ppi_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    if rho >= 1 or rho <= -1:
-        raise ValueError("`rho` must be between -1 and 1.")
+    if ppi_corr >= 1 or ppi_corr <= -1:
+        raise ValueError("`ppi_corr` must be between -1 and 1.")
 
     if sigma_sq <= 0:
         raise ValueError("`sigma_sq` must be positive")
 
     gamma, ppi_cost, classical_cost = _get_costs(
-        rho, cost_Y, cost_Yhat, cost_X
+        ppi_corr,  cost_X, cost_Y, cost_Yhat,
     )
 
     if budget is not None:
         return _get_powerful_pair(
             sigma_sq,
-            rho,
+            ppi_corr,
             gamma,
             ppi_cost,
             classical_cost,
+            cost_X,
             cost_Y,
             cost_Yhat,
-            cost_X,
             budget=budget,
             n_max=n_max,
         )
     else:
         return _get_cheap_pair(
             sigma_sq,
-            rho,
+            ppi_corr,
             gamma,
             ppi_cost,
             classical_cost,
+            cost_X,
             cost_Y,
             cost_Yhat,
-            cost_X,
             se=se,
             n_max=n_max,
         )
 
 
 def _get_costs(
-    rho,
+    ppi_corr,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
 ):
     """
     Computes the cost of the most efficient PPI and classical estimators per classical sample.
 
     Args:
-        rho (ndarray): PPI correlation.
+        ppi_corr (ndarray): PPI correlation.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
         cost_X (float): Cost per unlabeled data point.
@@ -108,12 +108,12 @@ def _get_costs(
         classical_cost (float): Cost of the classical estimator per classical sample.
     """
     gamma = (cost_Yhat + cost_X) / cost_Y
-    rho_sq = rho**2
+    ppi_corr_sq = ppi_corr**2
     ppi_cost = cost_Y * (
         1
-        - rho_sq
-        + gamma * rho_sq
-        + 2 * (gamma * rho_sq * (1 - rho_sq)) ** 0.5
+        - ppi_corr_sq
+        + gamma * ppi_corr_sq
+        + 2 * (gamma * ppi_corr_sq * (1 - ppi_corr_sq)) ** 0.5
     )
     classical_cost = cost_Y + cost_X
     return gamma, ppi_cost, classical_cost
@@ -121,13 +121,13 @@ def _get_costs(
 
 def _get_powerful_pair(
     sigma_sq,
-    rho,
+    ppi_corr,
     gamma,
     ppi_cost,
     classical_cost,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
     budget,
     n_max=None,
 ):
@@ -136,7 +136,7 @@ def _get_powerful_pair(
 
     Args:
         sigma_sq (ndarray): Variance of the classical point estimate.
-        rho (ndarray): PPI correlation.
+        ppi_corr (ndarray): PPI correlation.
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
         ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
         classical_cost (float): Cost of the classical estimator per classical sample.
@@ -152,12 +152,12 @@ def _get_powerful_pair(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
     """
 
     n0 = budget / ppi_cost
-    result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X)
+    result = _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(budget / classical_cost)
@@ -166,7 +166,7 @@ def _get_powerful_pair(
             "N": 0,
             "cost": n * classical_cost,
             "se": (sigma_sq / n) ** 0.5,
-            "rho": rho,
+            "ppi_corr": ppi_corr,
             "effective_n": n,
         }
 
@@ -181,32 +181,32 @@ def _get_powerful_pair(
             "N": 0,
             "cost": n_max * (cost_Y + cost_X),
             "se": (sigma_sq / n_max) ** 0.5,
-            "rho": rho,
+            "ppi_corr": ppi_corr,
             "effective_n": n_max,
         }
 
     n = int(budget / cost_Y - n_max * gamma)
     N = n_max - n
-    se = (sigma_sq / n * (1 - rho**2 * N / (n + N))) ** 0.5
+    se = (sigma_sq / n * (1 - ppi_corr**2 * N / (n + N))) ** 0.5
     return {
         "n": n,
         "N": N,
         "cost": n * (cost_Y + cost_Yhat + cost_X) + N * (cost_Yhat + cost_X),
         "se": se,
-        "rho": rho,
+        "ppi_corr": ppi_corr,
         "effective_n": int(sigma_sq / se**2),
     }
 
 
 def _get_cheap_pair(
     sigma_sq,
-    rho,
+    ppi_corr,
     gamma,
     ppi_cost,
     classical_cost,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
     se,
     n_max=None,
 ):
@@ -215,7 +215,7 @@ def _get_cheap_pair(
 
     Args:
         sigma_sq (ndarray): Variance of the classical point estimate.
-        rho (ndarray): PPI correlation.
+        ppi_corr (ndarray): PPI correlation.
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
         ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
         classical_cost (float): Cost of the classical estimator per classical sample.
@@ -232,7 +232,7 @@ def _get_cheap_pair(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -240,7 +240,7 @@ def _get_cheap_pair(
     """
 
     n0 = sigma_sq / se**2
-    result = _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X)
+    result = _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(sigma_sq / se**2)
@@ -249,7 +249,7 @@ def _get_cheap_pair(
             "N": 0,
             "cost": n * classical_cost,
             "se": (sigma_sq / n) ** 0.5,
-            "rho": rho,
+            "ppi_corr": ppi_corr,
             "effective_n": n,
         }
 
@@ -270,7 +270,7 @@ def _get_cheap_pair(
             "N": 0,
             "cost": n * classical_cost,
             "se": (sigma_sq / n) ** 0.5,
-            "rho": rho,
+            "ppi_corr": ppi_corr,
             "effective_n": n,
         }
 
@@ -278,30 +278,30 @@ def _get_cheap_pair(
         n = int(
             n_max
             * sigma_sq
-            * (1 - rho**2)
-            / (n_max * se**2 - rho**2 * sigma_sq)
+            * (1 - ppi_corr**2)
+            / (n_max * se**2 - ppi_corr**2 * sigma_sq)
         )
         N = n_max - n
-        se = (sigma_sq / n * (1 - rho**2 * N / (n + N))) ** 0.5
+        se = (sigma_sq / n * (1 - ppi_corr**2 * N / (n + N))) ** 0.5
         return {
             "n": n,
             "N": N,
             "cost": n * (cost_Y + cost_Yhat + cost_X)
             + N * (cost_Yhat + cost_X),
             "se": se,
-            "rho": rho,
+            "ppi_corr": ppi_corr,
             "effective_n": int(sigma_sq / se**2),
         }
 
 
-def _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X):
+def _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat):
     """ "
     Compute the optimal pair of PPI samples achieving the same standard error as a classical estimator with n0 samples.
 
     Args:
         n0 (float): Number of samples for the classical estimator.
         sigma_sq (float): Variance of the classical point estimate.
-        rho (float): PPI correlation.
+        ppi_corr (float): PPI correlation.
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
         cost_Y (float): Cost per gold-standard label.
     Returns:
@@ -310,25 +310,25 @@ def _optimal_pair(n0, sigma_sq, rho, gamma, cost_Y, cost_Yhat, cost_X):
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
     """
-    rho_sq = rho**2
-    n = n0 * (1 - rho_sq + np.sqrt(gamma * rho_sq * (1 - rho_sq)))
-    N = n * (n0 - n) / (n - (1 - rho_sq) * n0)
+    ppi_corr_sq = ppi_corr**2
+    n = n0 * (1 - ppi_corr_sq + np.sqrt(gamma * ppi_corr_sq * (1 - ppi_corr_sq)))
+    N = n * (n0 - n) / (n - (1 - ppi_corr_sq) * n0)
 
     n = int(n)
     N = int(N)
 
     cost = n * cost_Y + (n + N) * (cost_Yhat + cost_X)
-    se = ((sigma_sq / n) ** 0.5) * ((1 - rho_sq * N / (n + N))) ** 0.5
+    se = ((sigma_sq / n) ** 0.5) * ((1 - ppi_corr_sq * N / (n + N))) ** 0.5
 
     return {
         "n": n,
         "N": N,
         "cost": cost,
         "se": se,
-        "rho": rho,
+        "ppi_corr": ppi_corr,
         "effective_n": int(sigma_sq / se**2),
     }
 
@@ -372,7 +372,7 @@ def ppi_mean_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -406,16 +406,16 @@ def ppi_mean_power(
     grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
     inv_hessian = np.eye(d)
 
-    sigma_sq, rho = _get_power_analysis_params(
+    sigma_sq, ppi_corr = _get_power_analysis_params(
         grads, grads_hat, grads_hat_unlabeled, inv_hessian
     )
 
     return ppi_power(
         sigma_sq,
-        rho,
-        cost_Y,
-        cost_Yhat,
+        ppi_corr,
         cost_X=0,
+        cost_Y=cost_Y,
+        cost_Yhat=cost_Yhat,
         budget=budget,
         se=se,
         n_max=n_max,
@@ -467,13 +467,13 @@ def _get_power_analysis_params(
     denom = np.sqrt(
         sigma_sq * np.diag(inv_hessian @ var_grads_hat @ inv_hessian)
     )
-    rho_sq = num / denom
-    rho_sq = np.minimum(rho_sq, 1 - 1 / n)
+    ppi_corr_sq = num / denom
+    ppi_corr_sq = np.minimum(ppi_corr_sq, 1 - 1 / n)
 
     if coord is not None:
-        return sigma_sq[coord], rho_sq[coord]
+        return sigma_sq[coord], ppi_corr_sq[coord]
     else:
-        return sigma_sq[0], rho_sq[0]
+        return sigma_sq[0], ppi_corr_sq[0]
 
 
 """
@@ -488,9 +488,9 @@ def ppi_ols_power(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
     coord,
     budget=None,
     se=None,
@@ -523,7 +523,7 @@ def ppi_ols_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -547,12 +547,12 @@ def ppi_ols_power(
         w_unlabeled=w_unlabeled,
     )
 
-    sigma_sq, rho = _get_power_analysis_params(
+    sigma_sq, ppi_corr = _get_power_analysis_params(
         grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
     )
 
     return ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget, se, n_max
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )
 
 
@@ -567,9 +567,9 @@ def ppi_logistic_power(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
     coord,
     budget=None,
     se=None,
@@ -602,7 +602,7 @@ def ppi_logistic_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -626,12 +626,12 @@ def ppi_logistic_power(
         w_unlabeled=w_unlabeled,
     )
 
-    sigma_sq, rho = _get_power_analysis_params(
+    sigma_sq, ppi_corr = _get_power_analysis_params(
         grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
     )
 
     return ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget, se, n_max
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )
 
 
@@ -646,9 +646,9 @@ def ppi_poisson_power(
     Yhat,
     X_unlabeled,
     Yhat_unlabeled,
+    cost_X,
     cost_Y,
     cost_Yhat,
-    cost_X,
     coord,
     budget=None,
     se=None,
@@ -681,7 +681,7 @@ def ppi_poisson_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            rho (float): PPI correlation as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in [BHvL24].
             effective_n (int): Effective number of samples as defined in [BHvL24].
 
     Notes:
@@ -705,10 +705,10 @@ def ppi_poisson_power(
         w_unlabeled=w_unlabeled,
     )
 
-    sigma_sq, rho = _get_power_analysis_params(
+    sigma_sq, ppi_corr = _get_power_analysis_params(
         grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
     )
 
     return ppi_power(
-        sigma_sq, rho, cost_Y, cost_Yhat, cost_X, budget, se, n_max
+        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )
