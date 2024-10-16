@@ -19,7 +19,7 @@ from .ppi import (
 
 
 def ppi_power(
-    sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=None, se=None, n_max=None
+    ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=None, se=None, n_max=None
 ):
     """
     Computes the optimal pair of sample sizes for PPI when the asymptotic variance sigma_sq and the PPI correlation are known.
@@ -27,9 +27,9 @@ def ppi_power(
     Args:
         sigma_sq (float): Asymptotic variance of the classical point estimate.
         ppi_corr (float): PPI correlation as defined in [BHvL24].
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
@@ -50,7 +50,7 @@ def ppi_power(
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
     if ppi_corr >= 1 or ppi_corr <= -1:
-        raise ValueError("`ppi_corr` must be between -1 and 1.")
+        raise ValueError("`ppi_corr` must be strictly between -1 and 1.")
 
     if sigma_sq <= 0:
         raise ValueError("`sigma_sq` must be positive")
@@ -98,9 +98,9 @@ def _get_costs(
 
     Args:
         ppi_corr (ndarray): PPI correlation.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
 
     Returns:
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
@@ -140,9 +140,9 @@ def _get_powerful_pair(
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
         ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
         classical_cost (float): Cost of the classical estimator per classical sample.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         budget (float): Total budget.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
 
@@ -157,7 +157,7 @@ def _get_powerful_pair(
     """
 
     n0 = budget / ppi_cost
-    result = _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
+    result = _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(budget / classical_cost)
@@ -219,9 +219,9 @@ def _get_cheap_pair(
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
         ppi_cost (float): Cost of the most efficient PPI estimator per classical sample.
         classical_cost (float): Cost of the classical estimator per classical sample.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         se (float): Desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
 
@@ -240,7 +240,7 @@ def _get_cheap_pair(
     """
 
     n0 = sigma_sq / se**2
-    result = _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
+    result = _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(sigma_sq / se**2)
@@ -294,7 +294,7 @@ def _get_cheap_pair(
         }
 
 
-def _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat):
+def _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat):
     """ "
     Compute the optimal pair of PPI samples achieving the same standard error as a classical estimator with n0 samples.
 
@@ -315,7 +315,10 @@ def _optimal_pair(n0, sigma_sq, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat):
     """
     ppi_corr_sq = ppi_corr**2
     n = n0 * (1 - ppi_corr_sq + np.sqrt(gamma * ppi_corr_sq * (1 - ppi_corr_sq)))
-    N = n * (n0 - n) / (n - (1 - ppi_corr_sq) * n0)
+    if ppi_corr != 0:
+        N = n * (n0 - n) / (n - (1 - ppi_corr_sq) * n0)
+    else:
+        N = 0
 
     n = int(n)
     N = int(N)
@@ -411,8 +414,8 @@ def ppi_mean_power(
     )
 
     return ppi_power(
-        sigma_sq,
         ppi_corr,
+        sigma_sq,
         cost_X=0,
         cost_Y=cost_Y,
         cost_Yhat=cost_Yhat,
@@ -507,9 +510,9 @@ def ppi_ols_power(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
@@ -552,7 +555,7 @@ def ppi_ols_power(
     )
 
     return ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )
 
 
@@ -586,9 +589,9 @@ def ppi_logistic_power(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
@@ -631,7 +634,7 @@ def ppi_logistic_power(
     )
 
     return ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )
 
 
@@ -665,9 +668,9 @@ def ppi_poisson_power(
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
         X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
         Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        cost_X (float): Cost per unlabeled data point.
         coord (int): Coordinate to perform power analysis on. Must be in {0, ..., d-1} where d is the shape of the estimand.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
@@ -710,5 +713,5 @@ def ppi_poisson_power(
     )
 
     return ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget, se, n_max
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget, se, n_max
     )

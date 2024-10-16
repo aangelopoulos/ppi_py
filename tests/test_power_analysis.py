@@ -59,7 +59,7 @@ def test_ppi_poweranalysis_powerful():
     budget = 1000
 
     powerful_pair = ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -91,7 +91,7 @@ def test_ppi_poweranalysis_powerful2():
     budget = 1000
 
     powerful_pair = ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -124,7 +124,7 @@ def test_ppi_poweranalysis_powerful3():
     n_max = 1500
 
     powerful_pair = ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget, n_max=n_max
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget, n_max=n_max
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -163,7 +163,7 @@ def test_ppi_poweranalysis_cheapest():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se)
+    cheapest_pair = ppi_power(ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se)
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -197,7 +197,7 @@ def test_ppi_poweranalysis_cheapest2():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se)
+    cheapest_pair = ppi_power(ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se)
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -233,7 +233,7 @@ def test_ppi_poweranalysis_cheapest3():
     n_max = 15000
 
     cheapest_pair = ppi_power(
-        sigma_sq, ppi_corr, cost_X, cost_Y, cost_Yhat, se=se, n_max=n_max
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se, n_max=n_max
     )
 
     # Check if the cheapest pair achieves the desired se
@@ -438,9 +438,9 @@ def test_ppi_poweranalysis_OLS():
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
+        cost_X,
         cost_Y,
         cost_Yhat,
-        cost_X,
         coord,
         budget=budget,
     )
@@ -469,7 +469,7 @@ def test_ppi_poweranalysis_OLS():
     assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
 
 
-test_ppi_poweranalysis_OLS()
+
 
 """
     Power analysis for logistic regression
