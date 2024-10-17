@@ -6,7 +6,7 @@ from ppi_py.baselines import *
 from scipy.stats import norm
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from scipy.special import expit
+from ppi_py.utils.statistics_utils import safe_expit
 
 """
     Power analysis tests for most powerful pair
@@ -521,12 +521,12 @@ def simulate_logistic_model(n_star, N_star, ppi_corr_0, beta):
     X = np.random.normal(0, 1, (n_star, d))
     X_unlabeled = np.random.normal(0, 1, (N_star, d))
 
-    Y = np.random.binomial(1, expit(X @ beta))
+    Y = np.random.binomial(1, safe_expit(X @ beta))
     flips = np.random.binomial(1, p, n_star)
     Yhat = Y.copy()
     Yhat[flips == 1] = np.random.binomial(1, 0.5, np.sum(flips))
 
-    Y_unlabeled = np.random.binomial(1, expit(X_unlabeled @ beta))
+    Y_unlabeled = np.random.binomial(1, safe_expit(X_unlabeled @ beta))
     flips_unlabeled = np.random.binomial(1, p, N_star)
     Yhat_unlabeled = Y_unlabeled.copy()
     Yhat_unlabeled[flips_unlabeled == 1] = np.random.binomial(
