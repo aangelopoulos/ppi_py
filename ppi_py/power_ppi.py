@@ -19,7 +19,14 @@ from .ppi import (
 
 
 def ppi_power(
-    ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=None, se=None, n_max=None
+    ppi_corr,
+    sigma_sq,
+    cost_X,
+    cost_Y,
+    cost_Yhat,
+    budget=None,
+    se=None,
+    n_max=None,
 ):
     """
     Computes the optimal pair of sample sizes for PPI when the asymptotic variance sigma_sq and the PPI correlation are known.
@@ -56,7 +63,10 @@ def ppi_power(
         raise ValueError("`sigma_sq` must be positive")
 
     gamma, ppi_cost, classical_cost = _get_costs(
-        ppi_corr,  cost_X, cost_Y, cost_Yhat,
+        ppi_corr,
+        cost_X,
+        cost_Y,
+        cost_Yhat,
     )
 
     if budget is not None:
@@ -157,7 +167,9 @@ def _get_powerful_pair(
     """
 
     n0 = budget / ppi_cost
-    result = _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat)
+    result = _optimal_pair(
+        n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat
+    )
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(budget / classical_cost)
@@ -240,7 +252,9 @@ def _get_cheap_pair(
     """
 
     n0 = sigma_sq / se**2
-    result = _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat)
+    result = _optimal_pair(
+        n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat
+    )
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = int(sigma_sq / se**2)
@@ -314,7 +328,9 @@ def _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat):
             effective_n (int): Effective number of samples as defined in [BHvL24].
     """
     ppi_corr_sq = ppi_corr**2
-    n = n0 * (1 - ppi_corr_sq + np.sqrt(gamma * ppi_corr_sq * (1 - ppi_corr_sq)))
+    n = n0 * (
+        1 - ppi_corr_sq + np.sqrt(gamma * ppi_corr_sq * (1 - ppi_corr_sq))
+    )
     if ppi_corr != 0:
         N = n * (n0 - n) / (n - (1 - ppi_corr_sq) * n0)
     else:
@@ -474,9 +490,9 @@ def _get_power_analysis_params(
     ppi_corr_sq = np.minimum(ppi_corr_sq, 1 - 1 / n)
 
     if coord is not None:
-        return sigma_sq[coord], ppi_corr_sq[coord]
+        return float(sigma_sq[coord]), float(ppi_corr_sq[coord])
     else:
-        return sigma_sq[0], ppi_corr_sq[0]
+        return float(sigma_sq[0]), float(ppi_corr_sq[0])
 
 
 """

@@ -1,7 +1,7 @@
 import numpy as np
 import statsmodels.api as sm
 from ppi_py.power_ppi import *
-from ppi_py.ppi import *
+from ppi_py import *
 from ppi_py.baselines import *
 from scipy.stats import norm
 from tqdm import tqdm
@@ -124,7 +124,13 @@ def test_ppi_poweranalysis_powerful3():
     n_max = 1500
 
     powerful_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget, n_max=n_max
+        ppi_corr,
+        sigma_sq,
+        cost_X,
+        cost_Y,
+        cost_Yhat,
+        budget=budget,
+        n_max=n_max,
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -163,7 +169,9 @@ def test_ppi_poweranalysis_cheapest():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se)
+    cheapest_pair = ppi_power(
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se
+    )
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -197,7 +205,9 @@ def test_ppi_poweranalysis_cheapest2():
 
     se = 0.01
 
-    cheapest_pair = ppi_power(ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se)
+    cheapest_pair = ppi_power(
+        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se
+    )
 
     # Check if the cheapest pair achieves the desired se
     achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
@@ -318,7 +328,13 @@ def test_ppi_poweranalysis_mean():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(powerful_pair, cost_X = 0, cost_Y = cost_Y, cost_Yhat = cost_Yhat, epsilon = epsilon)
+    optimal = check_optimality(
+        powerful_pair,
+        cost_X=0,
+        cost_Y=cost_Y,
+        cost_Yhat=cost_Yhat,
+        epsilon=epsilon,
+    )
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
@@ -394,7 +410,9 @@ def simulate_ses_OLS(n_star, N_star, ppi_corr_0, beta, coord, reps=100):
             )
     else:
         for i in range(reps):
-            X, Y, _, _, _ = simulate_linear_model(n_star, N_star, ppi_corr_0, beta)
+            X, Y, _, _, _ = simulate_linear_model(
+                n_star, N_star, ppi_corr_0, beta
+            )
             CI = classical_ols_ci(X, Y, alpha=0.05)
             ses[i] = (CI[1][coord] - CI[0][coord]) / (2 * norm.ppf(0.975))
 
@@ -467,8 +485,6 @@ def test_ppi_poweranalysis_OLS():
 
     mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
     assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
-
-
 
 
 """
@@ -668,29 +684,3 @@ def test_ppi_poweranalysis_poisson():
 
     mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
     assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
-
-
-"""
-    Run all tests
-"""
-
-
-reps = 10
-for i in tqdm(range(reps)):
-    test_ppi_poweranalysis_powerful()
-    test_ppi_poweranalysis_powerful2()
-    test_ppi_poweranalysis_powerful3()
-
-    test_ppi_poweranalysis_cheapest()
-    test_ppi_poweranalysis_cheapest2()
-    test_ppi_poweranalysis_cheapest3()
-
-    test_ppi_poweranalysis_mean()
-    test_ppi_poweranalysis_mean2()
-
-    test_ppi_poweranalysis_OLS()
-    test_ppi_poweranalysis_logistic()
-    test_ppi_poweranalysis_poisson()
-
-
-print("All tests passed!")
