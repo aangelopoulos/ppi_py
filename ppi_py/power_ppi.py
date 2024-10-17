@@ -32,8 +32,8 @@ def ppi_power(
     Computes the optimal pair of sample sizes for PPI when the asymptotic variance sigma_sq and the PPI correlation are known.
 
     Args:
+        ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
         sigma_sq (float): Asymptotic variance of the classical point estimate.
-        ppi_corr (float): PPI correlation as defined in [BHvL24].
         cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
@@ -47,11 +47,13 @@ def ppi_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in.
+            effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
+        `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
+
     """
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
@@ -162,8 +164,8 @@ def _get_powerful_pair(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation.
+            effective_n (int): Effective number of samples.
     """
 
     n0 = budget / ppi_cost
@@ -244,8 +246,8 @@ def _get_cheap_pair(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation.
+            effective_n (int): Effective number.
 
     Notes:
         If sigma_sq / n_max > se**2, then there is no pair of sample sizes (n, N) with n + N <= n_max that has a standard error of se or smaller. In this case, the function will give a warning and will return n = n_max and N = 0. This is the most powerful pair of sample sizes that can be achieved with n_max unlabeled samples.
@@ -317,15 +319,18 @@ def _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat):
         sigma_sq (float): Variance of the classical point estimate.
         ppi_corr (float): PPI correlation.
         gamma (float): Ratio of the cost of a prediction plus unlabled data to the cost of a gold-standard label.
+        cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
+        cost_Yhat (float): Cost per prediction.
+
     Returns:
         Dictionary: containing the following items
             n (int): Optimal number of gold-labeled samples.
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined.
+            effective_n (int): Effective number of samples.
     """
     ppi_corr_sq = ppi_corr**2
     n = n0 * (
@@ -391,11 +396,12 @@ def ppi_mean_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+            effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
+        `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
@@ -542,11 +548,12 @@ def ppi_ols_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+            effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
 
     Notes:
         At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used.
+        `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
@@ -621,11 +628,12 @@ def ppi_logistic_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+            effective_n (int): Effective number of samples as defined in`[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
 
     Notes:
         At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used.
+        `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
@@ -700,11 +708,12 @@ def ppi_poisson_power(
             N (int): Optimal number of unlabeled samples.
             cost (float): Total cost.
             se (float): Estimated standard error of the PPI estimator.
-            ppi_corr (float): PPI correlation as defined in [BHvL24].
-            effective_n (int): Effective number of samples as defined in [BHvL24].
+            ppi_corr (float): PPI correlation `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+            effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `se` must be provided. If both are provided, `budget` will be used.
+        `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
