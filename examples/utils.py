@@ -4,8 +4,6 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pdb
-import pandas as pd
-from ppi_py import ppi_ols_ci, classical_ols_ci, ppi_ols_pointestimate
 
 
 def plot_interval(
