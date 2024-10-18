@@ -2,14 +2,12 @@ import numpy as np
 import warnings
 from .utils import reshape_to_2d, construct_weight_vector
 from .ppi import (
-    ppi_mean_pointestimate,
-    ppi_ols_pointestimate,
     _ols_get_stats,
-    ppi_logistic_pointestimate,
     _logistic_get_stats,
-    ppi_poisson_pointestimate,
     _poisson_get_stats,
+    _wls
 )
+from sklearn.linear_model import LogisticRegression, PoissonRegressor
 
 
 """
@@ -366,14 +364,12 @@ def _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat):
 def ppi_mean_power(
     Y,
     Yhat,
-    Yhat_unlabeled,
     cost_Y,
     cost_Yhat,
     budget=None,
     se=None,
     n_max=None,
-    w=None,
-    w_unlabeled=None,
+    w=None
 ):
     """
     Computes the optimal pair of sample sizes for estimating the mean with ppi.
@@ -381,14 +377,12 @@ def ppi_mean_power(
     Args:
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
         budget (float, optional): Total budget. Used to compute the most powerful pair given the budget.
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy the additional constraint that n + N <= n_max.
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set. Defaults to all ones vector.
 
     Returns:
         Dictionary: containing the following items
@@ -409,30 +403,22 @@ def ppi_mean_power(
         raise ValueError("Y must be a 1D array.")
     if len(Yhat.shape) > 1 and Yhat.shape[1] > 1:
         raise ValueError("Yhat must be a 1D array.")
-    if len(Yhat_unlabeled.shape) > 1 and Yhat_unlabeled.shape[1] > 1:
-        raise ValueError("Yhat_unlabeled must be a 1D array.")
 
     Y = reshape_to_2d(Y)
     Yhat = reshape_to_2d(Yhat)
-    Yhat_unlabeled = reshape_to_2d(Yhat_unlabeled)
     n = Y.shape[0]
-    N = Yhat_unlabeled.shape[0]
     d = 1
 
     w = construct_weight_vector(n, w, vectorized=True)
-    w_unlabeled = construct_weight_vector(N, w_unlabeled, vectorized=True)
 
-    ppi_pointest = ppi_mean_pointestimate(
-        Y, Yhat, Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled
-    )
+    pointest = np.mean(Y)
 
-    grads = w * (Y - ppi_pointest)
-    grads_hat = w * (Yhat - ppi_pointest)
-    grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
+    grads = w * (Y - pointest)
+    grads_hat = w * (Yhat - pointest)
     inv_hessian = np.eye(d)
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
-        grads, grads_hat, grads_hat_unlabeled, inv_hessian
+        grads, grads_hat, inv_hessian
     )
 
     return ppi_power(
@@ -448,7 +434,7 @@ def ppi_mean_power(
 
 
 def _get_power_analysis_params(
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=None
+    grads, grads_hat,  inv_hessian, coord=None
 ):
     """
     Calculates the parameters needed for power analysis.
@@ -456,7 +442,6 @@ def _get_power_analysis_params(
     Args:
         grads (ndarray): Gradient of the loss function with respect to the parameter evaluated at the labeled data.
         grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
-        grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
         inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
         coord (int, optional): Coordinate for regression coefficients. Must be in {1, ..., d} where d is the shape of the estimand.
 
@@ -466,10 +451,8 @@ def _get_power_analysis_params(
     """
     grads = reshape_to_2d(grads)
     grads_hat = reshape_to_2d(grads_hat)
-    grads_hat_unlabeled = reshape_to_2d(grads_hat_unlabeled)
 
     n = grads.shape[0]
-    N = grads_hat_unlabeled.shape[0]
     d = inv_hessian.shape[0]
 
     if grads.shape[1] != d:
@@ -477,13 +460,10 @@ def _get_power_analysis_params(
             "Dimension mismatch between the gradient and the inverse Hessian."
         )
     grads_cent = grads - grads.mean(axis=0)
-    grad_hat_cent = grads_hat - grads_hat.mean(axis=0)
-    cov_grads = (1 / n) * grads_cent.T @ grad_hat_cent
+    grads_hat_cent = grads_hat - grads_hat.mean(axis=0)
+    cov_grads = (1 / n) * grads_cent.T @ grads_hat_cent
 
-    var_grads_hat = np.cov(
-        np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
-    )
-    var_grads_hat = var_grads_hat.reshape(d, d)
+    var_grads_hat = grads_hat_cent.T @ grads_hat_cent / n
     var_grads = grads_cent.T @ grads_cent / n
 
     sigma_sq = np.diag(inv_hessian @ var_grads @ inv_hessian)
@@ -511,8 +491,6 @@ def ppi_ols_power(
     X,
     Y,
     Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
     cost_X,
     cost_Y,
     cost_Yhat,
@@ -521,7 +499,6 @@ def ppi_ols_power(
     se=None,
     n_max=None,
     w=None,
-    w_unlabeled=None,
 ):
     """
     Computes the optimal pair of sample sizes for estimating OLS coefficients with PPI.
@@ -530,8 +507,6 @@ def ppi_ols_power(
         X (ndarray): Covariates corresponding to the gold-standard labels.
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
@@ -540,7 +515,6 @@ def ppi_ols_power(
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy the additional constraint that n + N <= n_max.
         w (ndarray, optional): Sample weights for the labeled data set.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         Dictionary: containing the following items
@@ -558,23 +532,21 @@ def ppi_ols_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    ppi_pointest = ppi_ols_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled
-    )
+    pointest = _wls(X, Y, w=w)
 
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
-        ppi_pointest,
+    grads, grads_hat, _, inv_hessian = _ols_get_stats(
+        pointest,
         X.astype(float),
         Y,
         Yhat,
-        X_unlabeled.astype(float),
-        Yhat_unlabeled,
+        X.astype(float),
+        Yhat,
         w=w,
-        w_unlabeled=w_unlabeled,
+        use_unlabeled=False
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
-        grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
+        grads, grads_hat, inv_hessian, coord=coord
     )
 
     return ppi_power(
@@ -591,8 +563,6 @@ def ppi_logistic_power(
     X,
     Y,
     Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
     cost_X,
     cost_Y,
     cost_Yhat,
@@ -601,7 +571,6 @@ def ppi_logistic_power(
     se=None,
     n_max=None,
     w=None,
-    w_unlabeled=None,
 ):
     """
     Computes the optimal pair of sample sizes for estimating logistic regression coefficients with PPI.
@@ -610,8 +579,6 @@ def ppi_logistic_power(
         X (ndarray): Covariates corresponding to the gold-standard labels.
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
@@ -620,7 +587,6 @@ def ppi_logistic_power(
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy the additional constraint that n + N <= n_max.
         w (ndarray, optional): Sample weights for the labeled data set.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         Dictionary: containing the following items
@@ -638,23 +604,26 @@ def ppi_logistic_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    ppi_pointest = ppi_logistic_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled
-    )
+    pointest = LogisticRegression(
+            penalty=None,
+            solver="lbfgs",
+            max_iter=10000,
+            tol=1e-15,
+            fit_intercept=False,).fit(X, Y).coef_.squeeze()
 
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(
-        ppi_pointest,
+    grads, grads_hat, _, inv_hessian = _logistic_get_stats(
+        pointest,
         X.astype(float),
         Y,
         Yhat,
-        X_unlabeled.astype(float),
-        Yhat_unlabeled,
+        X.astype(float),
+        Yhat,
         w=w,
-        w_unlabeled=w_unlabeled,
+        use_unlabeled=False
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
-        grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
+        grads, grads_hat, inv_hessian, coord=coord
     )
 
     return ppi_power(
@@ -671,8 +640,6 @@ def ppi_poisson_power(
     X,
     Y,
     Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
     cost_X,
     cost_Y,
     cost_Yhat,
@@ -680,8 +647,7 @@ def ppi_poisson_power(
     budget=None,
     se=None,
     n_max=None,
-    w=None,
-    w_unlabeled=None,
+    w=None
 ):
     """
     Computes the optimal pair of sample sizes for estimating Poisson regression coefficients with PPI.
@@ -690,8 +656,6 @@ def ppi_poisson_power(
         X (ndarray): Covariates corresponding to the gold-standard labels.
         Y (ndarray): Gold-standard labels.
         Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
         cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
@@ -700,7 +664,6 @@ def ppi_poisson_power(
         se (float, optional): Desired standard error. Used to compute the cheapest pair achieving a desired standard error.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy the additional constraint that n + N <= n_max.
         w (ndarray, optional): Sample weights for the labeled data set.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
 
     Returns:
         Dictionary: containing the following items
@@ -718,23 +681,26 @@ def ppi_poisson_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    ppi_pointest = ppi_poisson_pointestimate(
-        X, Y, Yhat, X_unlabeled, Yhat_unlabeled, w=w, w_unlabeled=w_unlabeled
-    )
-
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _poisson_get_stats(
-        ppi_pointest,
+    pointest = PoissonRegressor(
+            alpha=0,
+            fit_intercept=False,
+            max_iter=10000,
+            tol=1e-15,
+        ).fit(X, Y).coef_
+    
+    grads, grads_hat, _, inv_hessian = _poisson_get_stats(
+        pointest,
         X.astype(float),
         Y,
         Yhat,
-        X_unlabeled.astype(float),
-        Yhat_unlabeled,
+        X.astype(float),
+        Yhat,
         w=w,
-        w_unlabeled=w_unlabeled,
+        use_unlabeled=False
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
-        grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord=coord
+        grads, grads_hat, inv_hessian, coord=coord
     )
 
     return ppi_power(

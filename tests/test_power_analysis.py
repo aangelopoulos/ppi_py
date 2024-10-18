@@ -307,7 +307,6 @@ def test_ppi_poweranalysis_mean():
 
     Y = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
     Yhat = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
-    Yhat_unlabelled = np.random.normal(0, 1, 1)
 
     cost_Y = 1
     cost_Yhat = 0.1
@@ -317,7 +316,7 @@ def test_ppi_poweranalysis_mean():
     epsilon = 0.02
 
     powerful_pair = ppi_mean_power(
-        Y, Yhat, Yhat_unlabelled, cost_Y, cost_Yhat, budget=budget
+        Y, Yhat, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -355,7 +354,6 @@ def test_ppi_poweranalysis_mean2():
 
     Y = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z2
     Yhat = ppi_corr_0**0.5 * Z1 + (1 - ppi_corr_0) ** 0.5 * Z3
-    Yhat_unlabelled = np.random.normal(0, 1, 1)
 
     cost_Y = 1
     cost_Yhat = 0.1
@@ -365,7 +363,7 @@ def test_ppi_poweranalysis_mean2():
     epsilon = 0.02
 
     powerful_pair = ppi_mean_power(
-        Y, Yhat, Yhat_unlabelled, cost_Y, cost_Yhat, budget=budget
+        Y, Yhat, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -446,16 +444,14 @@ def test_ppi_poweranalysis_OLS():
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_linear_model(
-        5000, 5000, ppi_corr_0, beta
+    X, Y, Yhat, _, _ = simulate_linear_model(
+        5000, 1, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_ols_power(
         X,
         Y,
         Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
         cost_X,
         cost_Y,
         cost_Yhat,
@@ -543,20 +539,18 @@ def test_ppi_poweranalysis_logistic():
 
     cost_Y = 1
     cost_Yhat = 0.1
-    cost_X = 0.5
+    cost_X = 0.1
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_logistic_model(
-        10000, 10000, ppi_corr_0, beta
+    X, Y, Yhat, _, _ = simulate_logistic_model(
+        10000, 1, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_logistic_power(
         X,
         Y,
         Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
         cost_X,
         cost_Y,
         cost_Yhat,
@@ -645,16 +639,14 @@ def test_ppi_poweranalysis_poisson():
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, X_unlabeled, Yhat_unlabeled = simulate_poisson_model(
-        10000, 10000, ppi_corr_0, beta
+    X, Y, Yhat, _, _ = simulate_poisson_model(
+        10000, 1, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_poisson_power(
         X,
         Y,
         Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
         cost_X,
         cost_Y,
         cost_Yhat,
