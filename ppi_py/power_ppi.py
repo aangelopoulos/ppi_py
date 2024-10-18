@@ -411,7 +411,7 @@ def ppi_mean_power(
 
     w = construct_weight_vector(n, w, vectorized=True)
 
-    pointest = np.mean(Y)
+    pointest = np.sum(w * Y) / np.sum(w)
 
     grads = w * (Y - pointest)
     grads_hat = w * (Yhat - pointest)

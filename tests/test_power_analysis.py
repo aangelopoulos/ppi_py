@@ -445,7 +445,7 @@ def test_ppi_poweranalysis_OLS():
     epsilon = 0.02
 
     X, Y, Yhat, _, _ = simulate_linear_model(
-        5000, 1, ppi_corr_0, beta
+        5000, 0, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_ols_power(
@@ -544,7 +544,7 @@ def test_ppi_poweranalysis_logistic():
     epsilon = 0.02
 
     X, Y, Yhat, _, _ = simulate_logistic_model(
-        10000, 1, ppi_corr_0, beta
+        10000, 0, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_logistic_power(
@@ -640,7 +640,7 @@ def test_ppi_poweranalysis_poisson():
     epsilon = 0.02
 
     X, Y, Yhat, _, _ = simulate_poisson_model(
-        10000, 1, ppi_corr_0, beta
+        10000, 0, ppi_corr_0, beta
     )
 
     powerful_pair = ppi_poisson_power(
