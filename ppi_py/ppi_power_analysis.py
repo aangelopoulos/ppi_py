@@ -1,12 +1,7 @@
 import numpy as np
 import warnings
 from .utils import reshape_to_2d, construct_weight_vector
-from .ppi import (
-    _ols_get_stats,
-    _logistic_get_stats,
-    _poisson_get_stats,
-    _wls
-)
+from .ppi import _ols_get_stats, _logistic_get_stats, _poisson_get_stats, _wls
 from sklearn.linear_model import LogisticRegression, PoissonRegressor
 
 
@@ -362,14 +357,7 @@ def _optimal_pair(n0, ppi_corr, sigma_sq, gamma, cost_X, cost_Y, cost_Yhat):
 
 
 def ppi_mean_power(
-    Y,
-    Yhat,
-    cost_Y,
-    cost_Yhat,
-    budget=None,
-    se=None,
-    n_max=None,
-    w=None
+    Y, Yhat, cost_Y, cost_Yhat, budget=None, se=None, n_max=None, w=None
 ):
     """
     Computes the optimal pair of sample sizes for estimating the mean with ppi.
@@ -433,9 +421,7 @@ def ppi_mean_power(
     )
 
 
-def _get_power_analysis_params(
-    grads, grads_hat,  inv_hessian, coord=None
-):
+def _get_power_analysis_params(grads, grads_hat, inv_hessian, coord=None):
     """
     Calculates the parameters needed for power analysis.
 
@@ -542,7 +528,7 @@ def ppi_ols_power(
         X.astype(float),
         Yhat,
         w=w,
-        use_unlabeled=False
+        use_unlabeled=False,
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
@@ -604,12 +590,17 @@ def ppi_logistic_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    pointest = LogisticRegression(
+    pointest = (
+        LogisticRegression(
             penalty=None,
             solver="lbfgs",
             max_iter=10000,
             tol=1e-15,
-            fit_intercept=False,).fit(X, Y).coef_.squeeze()
+            fit_intercept=False,
+        )
+        .fit(X, Y)
+        .coef_.squeeze()
+    )
 
     grads, grads_hat, _, inv_hessian = _logistic_get_stats(
         pointest,
@@ -619,7 +610,7 @@ def ppi_logistic_power(
         X.astype(float),
         Yhat,
         w=w,
-        use_unlabeled=False
+        use_unlabeled=False,
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(
@@ -647,7 +638,7 @@ def ppi_poisson_power(
     budget=None,
     se=None,
     n_max=None,
-    w=None
+    w=None,
 ):
     """
     Computes the optimal pair of sample sizes for estimating Poisson regression coefficients with PPI.
@@ -681,13 +672,17 @@ def ppi_poisson_power(
     if budget is None and se is None:
         raise ValueError("At least one of `budget` and `se` must be provided.")
 
-    pointest = PoissonRegressor(
+    pointest = (
+        PoissonRegressor(
             alpha=0,
             fit_intercept=False,
             max_iter=10000,
             tol=1e-15,
-        ).fit(X, Y).coef_
-    
+        )
+        .fit(X, Y)
+        .coef_
+    )
+
     grads, grads_hat, _, inv_hessian = _poisson_get_stats(
         pointest,
         X.astype(float),
@@ -696,7 +691,7 @@ def ppi_poisson_power(
         X.astype(float),
         Yhat,
         w=w,
-        use_unlabeled=False
+        use_unlabeled=False,
     )
 
     sigma_sq, ppi_corr = _get_power_analysis_params(

@@ -1,6 +1,6 @@
 import numpy as np
 import statsmodels.api as sm
-from ppi_py.power_ppi import *
+from ppi_py.ppi_power_analysis import *
 from ppi_py import *
 from ppi_py.baselines import *
 from scipy.stats import norm
@@ -315,9 +315,7 @@ def test_ppi_poweranalysis_mean():
 
     epsilon = 0.02
 
-    powerful_pair = ppi_mean_power(
-        Y, Yhat, cost_Y, cost_Yhat, budget=budget
-    )
+    powerful_pair = ppi_mean_power(Y, Yhat, cost_Y, cost_Yhat, budget=budget)
 
     ## Check if the most powerful pair achieves the budget
     achieves_budget = (
@@ -362,9 +360,7 @@ def test_ppi_poweranalysis_mean2():
 
     epsilon = 0.02
 
-    powerful_pair = ppi_mean_power(
-        Y, Yhat, cost_Y, cost_Yhat, budget=budget
-    )
+    powerful_pair = ppi_mean_power(Y, Yhat, cost_Y, cost_Yhat, budget=budget)
 
     ## Check if the most powerful pair achieves the budget
     achieves_budget = (
@@ -444,9 +440,7 @@ def test_ppi_poweranalysis_OLS():
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, _, _ = simulate_linear_model(
-        5000, 0, ppi_corr_0, beta
-    )
+    X, Y, Yhat, _, _ = simulate_linear_model(5000, 0, ppi_corr_0, beta)
 
     powerful_pair = ppi_ols_power(
         X,
@@ -543,9 +537,7 @@ def test_ppi_poweranalysis_logistic():
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, _, _ = simulate_logistic_model(
-        10000, 0, ppi_corr_0, beta
-    )
+    X, Y, Yhat, _, _ = simulate_logistic_model(10000, 0, ppi_corr_0, beta)
 
     powerful_pair = ppi_logistic_power(
         X,
@@ -639,9 +631,7 @@ def test_ppi_poweranalysis_poisson():
     budget = 200
     epsilon = 0.02
 
-    X, Y, Yhat, _, _ = simulate_poisson_model(
-        10000, 0, ppi_corr_0, beta
-    )
+    X, Y, Yhat, _, _ = simulate_poisson_model(10000, 0, ppi_corr_0, beta)
 
     powerful_pair = ppi_poisson_power(
         X,
