@@ -62,8 +62,8 @@ def test_ppi_logistic_pointestimate_recovers():
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
-    
-    
+
+
 def test_ppi_logistic_pval_makesense():
     # Make a synthetic regression problem
     n = 10000
@@ -86,7 +86,7 @@ def test_ppi_logistic_pval_makesense():
         optimizer_options={"gtol": 1e-3},
     )
     assert beta_ppi_pval[-1] < 0.1
-    
+
     beta_ppi_pval = ppi_logistic_pval(
         X,
         Y,

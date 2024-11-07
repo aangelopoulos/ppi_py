@@ -3,7 +3,11 @@ from numba import njit
 from scipy.stats import norm, binom
 from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
-from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic, _zstat_generic2
+from statsmodels.stats.weightstats import (
+    _zconfint_generic,
+    _zstat_generic,
+    _zstat_generic2,
+)
 from sklearn.linear_model import LogisticRegression, PoissonRegressor
 import warnings
 
@@ -961,6 +965,7 @@ def _logistic_get_stats(
     inv_hessian = np.linalg.inv(hessian).reshape(d, d)
     return grads, grads_hat, grads_hat_unlabeled, inv_hessian
 
+
 def ppi_logistic_pval(
     X,
     Y,
@@ -1030,7 +1035,7 @@ def ppi_logistic_pval(
         w_unlabeled,
         use_unlabeled=use_unlabeled,
     )
-    
+
     if lam is None:
         lam = _calc_lam_glm(
             grads,
