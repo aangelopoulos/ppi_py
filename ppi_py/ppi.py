@@ -3,7 +3,11 @@ from numba import njit
 from scipy.stats import norm, binom
 from scipy.optimize import brentq, minimize
 from statsmodels.regression.linear_model import OLS, WLS
-from statsmodels.stats.weightstats import _zconfint_generic, _zstat_generic
+from statsmodels.stats.weightstats import (
+    _zconfint_generic,
+    _zstat_generic,
+    _zstat_generic2,
+)
 from sklearn.linear_model import LogisticRegression, PoissonRegressor
 import warnings
 
@@ -960,6 +964,112 @@ def _logistic_get_stats(
 
     inv_hessian = np.linalg.inv(hessian).reshape(d, d)
     return grads, grads_hat, grads_hat_unlabeled, inv_hessian
+
+
+def ppi_logistic_pval(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None,
+    alternative="two-sided",
+):
+    """Computes the prediction-powered pvalues on the logistic regression coefficients for the null hypothesis that the coefficient is zero.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+    n = Y.shape[0]
+    d = X.shape[1]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
+    use_unlabeled = lam != 0
+
+    ppi_pointest = ppi_logistic_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        optimizer_options=optimizer_options,
+        lam=lam,
+        coord=coord,
+        w=w,
+        w_unlabeled=w_unlabeled,
+    )
+
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(
+        ppi_pointest,
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        w,
+        w_unlabeled,
+        use_unlabeled=use_unlabeled,
+    )
+
+    if lam is None:
+        lam = _calc_lam_glm(
+            grads,
+            grads_hat,
+            grads_hat_unlabeled,
+            inv_hessian,
+            clip=True,
+        )
+        return ppi_logistic_pval(
+            X,
+            Y,
+            Yhat,
+            X_unlabeled,
+            Yhat_unlabeled,
+            optimizer_options=optimizer_options,
+            lam=lam,
+            coord=coord,
+            w=w,
+            w_unlabeled=w_unlabeled,
+            alternative=alternative,
+        )
+
+    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
+    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
+    Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
+
+    var_diag = np.sqrt(np.diag(Sigma_hat) / n)
+
+    pvals = _zstat_generic2(
+        ppi_pointest,
+        var_diag,
+        alternative=alternative,
+    )[1]
+    return pvals
 
 
 def ppi_logistic_ci(
