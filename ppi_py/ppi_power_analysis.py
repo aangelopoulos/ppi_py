@@ -46,11 +46,12 @@ def ppi_power(
 
     """
     if budget is None and effective_n is None:
-        raise ValueError("At least one of `budget` and `effective_n` must be provided.")
+        raise ValueError(
+            "At least one of `budget` and `effective_n` must be provided."
+        )
 
     if ppi_corr >= 1 or ppi_corr <= -1:
         raise ValueError("`ppi_corr` must be strictly between -1 and 1.")
-
 
     gamma, ppi_cost, classical_cost = _get_costs(
         ppi_corr,
@@ -152,9 +153,7 @@ def _get_powerful_pair(
     """
 
     n0 = budget / ppi_cost
-    result = _optimal_pair(
-        n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat
-    )
+    result = _optimal_pair(n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = round(budget / classical_cost)
@@ -163,7 +162,7 @@ def _get_powerful_pair(
             "N": 0,
             "cost": n * classical_cost,
             "effective_n": n,
-            "ppi_corr": ppi_corr
+            "ppi_corr": ppi_corr,
         }
 
     if n_max is None:
@@ -177,18 +176,18 @@ def _get_powerful_pair(
             "N": 0,
             "cost": n_max * (cost_Y + cost_X),
             "effective_n": n_max,
-            "ppi_corr": ppi_corr
+            "ppi_corr": ppi_corr,
         }
 
     n = round(budget / cost_Y - n_max * gamma)
     N = n_max - n
-    effective_n = round(n * (n + N) / (n + (1-ppi_corr**2) * N))
+    effective_n = round(n * (n + N) / (n + (1 - ppi_corr**2) * N))
     return {
         "n": n,
         "N": N,
         "cost": n * (cost_Y + cost_Yhat + cost_X) + N * (cost_Yhat + cost_X),
         "effective_n": effective_n,
-        "ppi_corr": ppi_corr
+        "ppi_corr": ppi_corr,
     }
 
 
@@ -214,7 +213,7 @@ def _get_cheap_pair(
         cost_X (float): Cost per unlabeled data point.
         cost_Y (float): Cost per gold-standard label.
         cost_Yhat (float): Cost per prediction.
-        effective_n (int): Effective sample size. 
+        effective_n (int): Effective sample size.
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
 
 
@@ -231,9 +230,7 @@ def _get_cheap_pair(
     """
 
     n0 = effective_n
-    result = _optimal_pair(
-        n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat
-    )
+    result = _optimal_pair(n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat)
 
     if classical_cost < ppi_cost or result["N"] < 0:
         n = round(n0)
@@ -242,7 +239,7 @@ def _get_cheap_pair(
             "N": 0,
             "cost": n * classical_cost,
             "effective_n": n,
-            "ppi_corr": ppi_corr
+            "ppi_corr": ppi_corr,
         }
 
     if n_max is None:
@@ -262,15 +259,13 @@ def _get_cheap_pair(
             "N": 0,
             "cost": n * classical_cost,
             "effective_n": n,
-            "ppi_corr": ppi_corr
+            "ppi_corr": ppi_corr,
         }
 
     else:
-        n = round(
-            n0 * n_max * (1 - ppi_corr**2) / (n_max - ppi_corr**2 * n0)
-        )
+        n = round(n0 * n_max * (1 - ppi_corr**2) / (n_max - ppi_corr**2 * n0))
         N = n_max - n
-        effective_n = round(n * (n + N) / (n + (1-ppi_corr**2) * N))
+        effective_n = round(n * (n + N) / (n + (1 - ppi_corr**2) * N))
         return {
             "n": n,
             "N": N,
@@ -332,7 +327,14 @@ def _optimal_pair(n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat):
 
 
 def ppi_mean_power(
-    Y, Yhat, cost_Y, cost_Yhat, budget=None, effective_n=None, n_max=None, w=None
+    Y,
+    Yhat,
+    cost_Y,
+    cost_Yhat,
+    budget=None,
+    effective_n=None,
+    n_max=None,
+    w=None,
 ):
     """
     Computes the optimal pair of sample sizes for estimating the mean with ppi.
@@ -360,7 +362,9 @@ def ppi_mean_power(
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
-        raise ValueError("At least one of `budget` and `effective_n` must be provided.")
+        raise ValueError(
+            "At least one of `budget` and `effective_n` must be provided."
+        )
     if len(Y.shape) > 1 and Y.shape[1] > 1:
         raise ValueError("Y must be a 1D array.")
     if len(Yhat.shape) > 1 and Yhat.shape[1] > 1:
@@ -379,9 +383,7 @@ def ppi_mean_power(
     grads_hat = w * (Yhat - pointest)
     inv_hessian = np.eye(d)
 
-    ppi_corr = _get_ppi_corr(
-        grads, grads_hat, inv_hessian
-    )
+    ppi_corr = _get_ppi_corr(grads, grads_hat, inv_hessian)
 
     return ppi_power(
         ppi_corr,
@@ -488,7 +490,9 @@ def ppi_ols_power(
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
-        raise ValueError("At least one of `budget` and `effective_n` must be provided.")
+        raise ValueError(
+            "At least one of `budget` and `effective_n` must be provided."
+        )
 
     pointest = _wls(X, Y, w=w)
 
@@ -503,9 +507,7 @@ def ppi_ols_power(
         use_unlabeled=False,
     )
 
-    ppi_corr = _get_ppi_corr(
-        grads, grads_hat, inv_hessian, coord=coord
-    )
+    ppi_corr = _get_ppi_corr(grads, grads_hat, inv_hessian, coord=coord)
 
     return ppi_power(
         ppi_corr, cost_X, cost_Y, cost_Yhat, budget, effective_n, n_max
@@ -559,7 +561,9 @@ def ppi_logistic_power(
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
-        raise ValueError("At least one of `budget` and `effective_n` must be provided.")
+        raise ValueError(
+            "At least one of `budget` and `effective_n` must be provided."
+        )
 
     pointest = (
         LogisticRegression(
@@ -584,9 +588,7 @@ def ppi_logistic_power(
         use_unlabeled=False,
     )
 
-    ppi_corr = _get_ppi_corr(
-        grads, grads_hat, inv_hessian, coord=coord
-    )
+    ppi_corr = _get_ppi_corr(grads, grads_hat, inv_hessian, coord=coord)
 
     return ppi_power(
         ppi_corr, cost_X, cost_Y, cost_Yhat, budget, effective_n, n_max
@@ -640,7 +642,9 @@ def ppi_poisson_power(
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
-        raise ValueError("At least one of `budget` and `effective_n` must be provided.")
+        raise ValueError(
+            "At least one of `budget` and `effective_n` must be provided."
+        )
 
     pointest = (
         PoissonRegressor(
@@ -664,9 +668,7 @@ def ppi_poisson_power(
         use_unlabeled=False,
     )
 
-    ppi_corr = _get_ppi_corr(
-        grads, grads_hat, inv_hessian, coord=coord
-    )
+    ppi_corr = _get_ppi_corr(grads, grads_hat, inv_hessian, coord=coord)
 
     return ppi_power(
         ppi_corr, cost_X, cost_Y, cost_Yhat, budget, effective_n, n_max

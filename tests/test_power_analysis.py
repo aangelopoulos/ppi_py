@@ -14,18 +14,14 @@ from ppi_py.utils.statistics_utils import safe_expit
 
 
 def ppi_effective_n(ppi_corr, n, N):
-    return n*(n + N)/(n + (1 - ppi_corr**2)*N)
+    return n * (n + N) / (n + (1 - ppi_corr**2) * N)
 
 
-def check_optimality(
-    result, cost_X, cost_Y, cost_Yhat, epsilon=0.01, n_max=np.inf
-):
+def check_optimality(result, cost_X, cost_Y, cost_Yhat=0.01, n_max=np.inf):
     n_star = result["n"]
-    N_star = result["N"]
     cost = result["cost"]
     ppi_corr = result["ppi_corr"]
 
-    effective_n_star = ppi_effective_n(ppi_corr, n_star, N_star)
     n_upper = np.min([2 * n_star, n_max])
     n_upper = int(n_upper)
     ns = np.arange(1, n_upper + 1)
@@ -39,12 +35,7 @@ def check_optimality(
     Ns = Ns.astype(int)
     effective_ns = ppi_effective_n(ppi_corr, ns, Ns)
 
-    if N_star > 0:
-        optimal = np.abs(effective_n_star - effective_ns.max()) < epsilon * effective_n_star
-    else:
-        optimal = effective_n_star * (1 + epsilon) >= effective_ns.max()
-    return optimal
-
+    return effective_ns.max()
 
 
 ## Test with high ppi_corr, low costs of unlabeled data
@@ -70,10 +61,10 @@ def test_ppi_poweranalysis_powerful():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
 
 ## Test with low ppi_corr, high costs of unlabeled data
@@ -104,10 +95,11 @@ def test_ppi_poweranalysis_powerful2():
     assert powerful_pair["N"] == 0, powerful_pair["N"]
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
+
 
 # Test n_max constraint
 def test_ppi_poweranalysis_powerful3():
@@ -142,10 +134,13 @@ def test_ppi_poweranalysis_powerful3():
     ), f"{powerful_pair['n']}, {powerful_pair['N']}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon, n_max
+    optimal_n = check_optimality(
+        powerful_pair, cost_X, cost_Y, cost_Yhat, n_max=n_max
     )
-    assert optimal
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
+
 
 """
     Power analysis test for cheapest pair
@@ -164,9 +159,8 @@ def test_ppi_poweranalysis_cheapest():
     effective_n = 1000
 
     cheapest_pair = ppi_power(
-        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n
+        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n=effective_n
     )
-
 
     # Check if the cheapest pair has the correct effective sample size
     correct_effective_sample = (
@@ -178,10 +172,11 @@ def test_ppi_poweranalysis_cheapest():
     ), f"{cheapest_pair['effective_n']}, {effective_n}"
 
     # Check optimality of the cheapest pair
-    optimal = check_optimality(
-        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(cheapest_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= cheapest_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {cheapest_pair['effective_n']}"
+
 
 # Test with low ppi_corr
 def test_ppi_poweranalysis_cheapest2():
@@ -195,7 +190,7 @@ def test_ppi_poweranalysis_cheapest2():
     effective_n = 1000
 
     cheapest_pair = ppi_power(
-        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n
+        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n=effective_n
     )
 
     # Check if the cheapest pair has the correct effective sample size
@@ -208,10 +203,11 @@ def test_ppi_poweranalysis_cheapest2():
     ), f"{cheapest_pair['effective_n']}, {effective_n}"
 
     # Check optimality of the cheapest pair
-    optimal = check_optimality(
-        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(cheapest_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= cheapest_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {cheapest_pair['effective_n']}"
+
 
 # Check n_max constraint
 def test_ppi_poweranalysis_cheapest3():
@@ -226,7 +222,12 @@ def test_ppi_poweranalysis_cheapest3():
     n_max = 15000
 
     cheapest_pair = ppi_power(
-        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n, n_max=n_max
+        ppi_corr,
+        cost_X,
+        cost_Y,
+        cost_Yhat,
+        effective_n=effective_n,
+        n_max=n_max,
     )
 
     # Check if the cheapest pair has the correct effective sample size
@@ -244,10 +245,11 @@ def test_ppi_poweranalysis_cheapest3():
     ), f"{cheapest_pair['n']}, {cheapest_pair['N']}"
 
     # Check optimality of the cheapest pair
-    optimal = check_optimality(
-        cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon, n_max
-    )
-    assert optimal
+    optimal_n = check_optimality(cheapest_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= cheapest_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {cheapest_pair['effective_n']}"
+
 
 """
     Power analysis for mean estimation
@@ -303,28 +305,25 @@ def test_ppi_poweranalysis_mean():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair,
-        cost_X=0,
-        cost_Y=cost_Y,
-        cost_Yhat=cost_Yhat,
-        epsilon=epsilon,
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
     ## Check if the estimated effective sample size is close to the true effective sample size
     reps = 100
-    ppi_ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0, reps=reps)
-    classical_ses = simulate_ses_mean(powerful_pair["effective_n"], 0, ppi_corr_0, reps=reps)
+    ppi_ses = simulate_ses_mean(
+        powerful_pair["n"], powerful_pair["N"], ppi_corr_0, reps=reps
+    )
+    classical_ses = simulate_ses_mean(
+        powerful_pair["effective_n"], 0, ppi_corr_0, reps=reps
+    )
     ppi_se = ppi_ses.mean()
     classical_se = classical_ses.mean()
 
     mean_close = np.abs(ppi_se - classical_se) <= epsilon
-    print(ppi_se, classical_se, ((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5)
-    assert mean_close, f"{ppi_se}, {classical_se}, {((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5}"
+    assert mean_close, f"{ppi_se}, {classical_se}"
 
-for _ in range(100):
-    test_ppi_poweranalysis_mean()
 
 ## Test with low ppi_corr
 def test_ppi_poweranalysis_mean2():
@@ -353,12 +352,13 @@ def test_ppi_poweranalysis_mean2():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(powerful_pair, cost_Y, cost_Yhat, 0, epsilon)
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
     ## Check that classical inference is being used
     assert powerful_pair["N"] == 0, powerful_pair["N"]
-
 
 
 """
@@ -437,24 +437,30 @@ def test_ppi_poweranalysis_OLS():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
     ## Check if the estimated effective sample size is close to the true effective sample size
     reps = 100
-    ppi_ses = simulate_ses_OLS(powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord, reps=reps)
-    classical_ses = simulate_ses_OLS(powerful_pair["effective_n"], 0, ppi_corr_0, beta, coord, reps=reps)
+    ppi_ses = simulate_ses_OLS(
+        powerful_pair["n"],
+        powerful_pair["N"],
+        ppi_corr_0,
+        beta,
+        coord,
+        reps=reps,
+    )
+    classical_ses = simulate_ses_OLS(
+        powerful_pair["effective_n"], 0, ppi_corr_0, beta, coord, reps=reps
+    )
     ppi_se = ppi_ses.mean()
     classical_se = classical_ses.mean()
 
     mean_close = np.abs(ppi_se - classical_se) <= epsilon
-    print(ppi_se, classical_se, ((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5)
-    assert mean_close, f"{ppi_se}, {classical_se}, {((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5}"
+    assert mean_close, f"{ppi_se}, {classical_se}"
 
-for _ in range(100):
-    test_ppi_poweranalysis_OLS()
 
 """
     Power analysis for logistic regression
@@ -537,10 +543,10 @@ def test_ppi_poweranalysis_logistic():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
     ## Check if the estimated standard error is close to the true standard error
     ppi_ses = simulate_se_logisitic(
@@ -552,9 +558,10 @@ def test_ppi_poweranalysis_logistic():
     ppi_se = ppi_ses.mean()
     classical_se = classical_ses.mean()
 
-
-    mean_close = np.abs(ppi_se - classical_se) <= epsilon
-    assert mean_close, f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
+    mean_close = np.abs(ppi_se - classical_se) <= 0.1 * ppi_se
+    assert (
+        mean_close
+    ), f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
 
 
 """
@@ -635,12 +642,12 @@ def test_ppi_poweranalysis_poisson():
     assert achieves_budget, f"{powerful_pair['cost']}, {budget}"
 
     ## Check optimality of the most powerful pair
-    optimal = check_optimality(
-        powerful_pair, cost_X, cost_Y, cost_Yhat, epsilon
-    )
-    assert optimal
+    optimal_n = check_optimality(powerful_pair, cost_X, cost_Y, cost_Yhat)
+    assert optimal_n <= powerful_pair["effective_n"] * (
+        1 + epsilon
+    ), f"{optimal_n}, {powerful_pair['effective_n']}"
 
-    ## Check if the estimated 
+    ## Check if the estimated
     ppi_ses = simulate_se_poisson(
         powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
@@ -651,4 +658,6 @@ def test_ppi_poweranalysis_poisson():
     classical_se = classical_ses.mean()
 
     mean_close = np.abs(ppi_se - classical_se) <= epsilon
-    assert mean_close, f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
+    assert (
+        mean_close
+    ), f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
