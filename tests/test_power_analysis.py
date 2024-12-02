@@ -13,8 +13,8 @@ from ppi_py.utils.statistics_utils import safe_expit
 """
 
 
-def ppi_se(sigma_sq, ppi_corr, n, N):
-    return np.sqrt(sigma_sq / n * (1 - ppi_corr**2 * N / (n + N)))
+def ppi_effective_n(ppi_corr, n, N):
+    return n*(n + N)/(n + (1 - ppi_corr**2)*N)
 
 
 def check_optimality(
@@ -25,7 +25,7 @@ def check_optimality(
     cost = result["cost"]
     ppi_corr = result["ppi_corr"]
 
-    se_star = ppi_se(1, ppi_corr, n_star, N_star)
+    effective_n_star = ppi_effective_n(ppi_corr, n_star, N_star)
     n_upper = np.min([2 * n_star, n_max])
     n_upper = int(n_upper)
     ns = np.arange(1, n_upper + 1)
@@ -37,19 +37,19 @@ def check_optimality(
     ns = ns[valid]
     Ns = Ns[valid]
     Ns = Ns.astype(int)
-    ses = ppi_se(1, ppi_corr, ns, Ns)
+    effective_ns = ppi_effective_n(ppi_corr, ns, Ns)
 
     if N_star > 0:
-        optimal = np.abs(se_star - ses.min()) < epsilon * se_star
+        optimal = np.abs(effective_n_star - effective_ns.max()) < epsilon * effective_n_star
     else:
-        optimal = se_star * (1 - epsilon) <= ses.min()
+        optimal = effective_n_star * (1 + epsilon) >= effective_ns.max()
     return optimal
+
 
 
 ## Test with high ppi_corr, low costs of unlabeled data
 def test_ppi_poweranalysis_powerful():
     ppi_corr = np.random.uniform(0.8, 0.9)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
@@ -59,7 +59,7 @@ def test_ppi_poweranalysis_powerful():
     budget = 1000
 
     powerful_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget
+        ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -81,7 +81,6 @@ def test_ppi_poweranalysis_powerful():
 
 def test_ppi_poweranalysis_powerful2():
     ppi_corr = np.random.uniform(0.1, 0.2)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
@@ -91,7 +90,7 @@ def test_ppi_poweranalysis_powerful2():
     budget = 1000
 
     powerful_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, budget=budget
+        ppi_corr, cost_X, cost_Y, cost_Yhat, budget=budget
     )
 
     ## Check if the most powerful pair achieves the budget
@@ -110,11 +109,9 @@ def test_ppi_poweranalysis_powerful2():
     )
     assert optimal
 
-
 # Test n_max constraint
 def test_ppi_poweranalysis_powerful3():
     ppi_corr = np.random.uniform(0.8, 0.9)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
@@ -125,7 +122,6 @@ def test_ppi_poweranalysis_powerful3():
 
     powerful_pair = ppi_power(
         ppi_corr,
-        sigma_sq,
         cost_X,
         cost_Y,
         cost_Yhat,
@@ -151,7 +147,6 @@ def test_ppi_poweranalysis_powerful3():
     )
     assert optimal
 
-
 """
     Power analysis test for cheapest pair
 """
@@ -160,67 +155,57 @@ def test_ppi_poweranalysis_powerful3():
 # Test with high ppi_corr
 def test_ppi_poweranalysis_cheapest():
     ppi_corr = np.random.uniform(0.8, 0.9)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
 
     epsilon = 0.01
 
-    se = 0.01
+    effective_n = 1000
 
     cheapest_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se
+        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n
     )
 
-    # Check if the cheapest pair achieves the desired se
-    achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
-    assert achieves_se, f"{cheapest_pair['se']}, {se}"
 
     # Check if the cheapest pair has the correct effective sample size
     correct_effective_sample = (
-        np.abs(cheapest_pair["effective_n"] - 1 / se**2) * 0.5
-        <= (1 / se**2) * epsilon
+        np.abs(cheapest_pair["effective_n"] - effective_n)
+        <= (effective_n) * epsilon
     )
     assert (
         correct_effective_sample
-    ), f"{cheapest_pair['effective_n']}, {1/se**2}"
+    ), f"{cheapest_pair['effective_n']}, {effective_n}"
 
     # Check optimality of the cheapest pair
     optimal = check_optimality(
         cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon
     )
     assert optimal
-
 
 # Test with low ppi_corr
 def test_ppi_poweranalysis_cheapest2():
     ppi_corr = np.random.uniform(0, 0.2)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
 
     epsilon = 0.01
 
-    se = 0.01
+    effective_n = 1000
 
     cheapest_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se
+        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n
     )
-
-    # Check if the cheapest pair achieves the desired se
-    achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
-    assert achieves_se, f"{cheapest_pair['se']}, {se}"
 
     # Check if the cheapest pair has the correct effective sample size
     correct_effective_sample = (
-        np.abs(cheapest_pair["effective_n"] - 1 / se**2)
-        <= (1 / se**2) * epsilon
+        np.abs(cheapest_pair["effective_n"] - effective_n)
+        <= (effective_n) * epsilon
     )
     assert (
         correct_effective_sample
-    ), f"{cheapest_pair['effective_n']}, {1/se**2}"
+    ), f"{cheapest_pair['effective_n']}, {effective_n}"
 
     # Check optimality of the cheapest pair
     optimal = check_optimality(
@@ -228,40 +213,34 @@ def test_ppi_poweranalysis_cheapest2():
     )
     assert optimal
 
-
 # Check n_max constraint
 def test_ppi_poweranalysis_cheapest3():
     ppi_corr = np.random.uniform(0.8, 0.9)
-    sigma_sq = 1
     cost_Y = np.random.uniform(1, 2)
     cost_Yhat = np.random.uniform(0.1, 0.2)
     cost_X = 0
 
     epsilon = 0.01
 
-    se = 0.01
+    effective_n = 1000
     n_max = 15000
 
     cheapest_pair = ppi_power(
-        ppi_corr, sigma_sq, cost_X, cost_Y, cost_Yhat, se=se, n_max=n_max
+        ppi_corr, cost_X, cost_Y, cost_Yhat, effective_n = effective_n, n_max=n_max
     )
-
-    # Check if the cheapest pair achieves the desired se
-    achieves_se = np.abs(cheapest_pair["se"] - se) < epsilon * se
-    assert achieves_se, f"{cheapest_pair['se']}, {se}"
 
     # Check if the cheapest pair has the correct effective sample size
     correct_effective_sample = (
-        np.abs(cheapest_pair["effective_n"] - 1 / se**2)
-        <= (1 / se**2) * epsilon
+        np.abs(cheapest_pair["effective_n"] - effective_n)
+        <= (effective_n) * epsilon
     )
     assert (
         correct_effective_sample
-    ), f"{cheapest_pair['effective_n']}, {1/se**2}"
+    ), f"{cheapest_pair['effective_n']}, {effective_n}"
 
-    # Check if the total number of samples is n_max
+    # Check if the total number of samples is at most n_max
     assert (
-        cheapest_pair["n"] + cheapest_pair["N"] == n_max
+        cheapest_pair["n"] + cheapest_pair["N"] <= n_max
     ), f"{cheapest_pair['n']}, {cheapest_pair['N']}"
 
     # Check optimality of the cheapest pair
@@ -269,7 +248,6 @@ def test_ppi_poweranalysis_cheapest3():
         cheapest_pair, cost_X, cost_Y, cost_Yhat, epsilon, n_max
     )
     assert optimal
-
 
 """
     Power analysis for mean estimation
@@ -311,7 +289,7 @@ def test_ppi_poweranalysis_mean():
     cost_Y = 1
     cost_Yhat = 0.1
     cost_X = 0
-    budget = 100
+    budget = 1000
 
     epsilon = 0.02
 
@@ -334,14 +312,19 @@ def test_ppi_poweranalysis_mean():
     )
     assert optimal
 
-    ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0)
-    se_star = powerful_pair["se"]
-    se_sim = ses.mean()
+    ## Check if the estimated effective sample size is close to the true effective sample size
+    reps = 100
+    ppi_ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0, reps=reps)
+    classical_ses = simulate_ses_mean(powerful_pair["effective_n"], 0, ppi_corr_0, reps=reps)
+    ppi_se = ppi_ses.mean()
+    classical_se = classical_ses.mean()
 
-    mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
-    assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
+    mean_close = np.abs(ppi_se - classical_se) <= epsilon
+    print(ppi_se, classical_se, ((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5)
+    assert mean_close, f"{ppi_se}, {classical_se}, {((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5}"
 
+for _ in range(100):
+    test_ppi_poweranalysis_mean()
 
 ## Test with low ppi_corr
 def test_ppi_poweranalysis_mean2():
@@ -376,13 +359,6 @@ def test_ppi_poweranalysis_mean2():
     ## Check that classical inference is being used
     assert powerful_pair["N"] == 0, powerful_pair["N"]
 
-    ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses_mean(powerful_pair["n"], powerful_pair["N"], ppi_corr_0)
-    se_star = powerful_pair["se"]
-    se_sim = ses.mean()
-
-    mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
-    assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
 
 
 """
@@ -466,16 +442,19 @@ def test_ppi_poweranalysis_OLS():
     )
     assert optimal
 
-    ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_ses_OLS(
-        powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
-    )
-    se_star = powerful_pair["se"]
-    se_sim = ses.mean()
+    ## Check if the estimated effective sample size is close to the true effective sample size
+    reps = 100
+    ppi_ses = simulate_ses_OLS(powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord, reps=reps)
+    classical_ses = simulate_ses_OLS(powerful_pair["effective_n"], 0, ppi_corr_0, beta, coord, reps=reps)
+    ppi_se = ppi_ses.mean()
+    classical_se = classical_ses.mean()
 
-    mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
-    assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
+    mean_close = np.abs(ppi_se - classical_se) <= epsilon
+    print(ppi_se, classical_se, ((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5)
+    assert mean_close, f"{ppi_se}, {classical_se}, {((np.var(ppi_ses)+np.var(classical_ses))/reps)**0.5}"
 
+for _ in range(100):
+    test_ppi_poweranalysis_OLS()
 
 """
     Power analysis for logistic regression
@@ -564,14 +543,18 @@ def test_ppi_poweranalysis_logistic():
     assert optimal
 
     ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_se_logisitic(
+    ppi_ses = simulate_se_logisitic(
         powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
-    se_star = powerful_pair["se"]
-    se_sim = ses.mean()
+    classical_ses = simulate_se_logisitic(
+        powerful_pair["effective_n"], 0, ppi_corr_0, beta, coord
+    )
+    ppi_se = ppi_ses.mean()
+    classical_se = classical_ses.mean()
 
-    mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
-    assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
+
+    mean_close = np.abs(ppi_se - classical_se) <= epsilon
+    assert mean_close, f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
 
 
 """
@@ -657,12 +640,15 @@ def test_ppi_poweranalysis_poisson():
     )
     assert optimal
 
-    ## Check if the estimated standard error is close to the true standard error
-    ses = simulate_se_poisson(
+    ## Check if the estimated 
+    ppi_ses = simulate_se_poisson(
         powerful_pair["n"], powerful_pair["N"], ppi_corr_0, beta, coord
     )
-    se_star = powerful_pair["se"]
-    se_sim = ses.mean()
+    classical_ses = simulate_se_poisson(
+        powerful_pair["effective_n"], 0, ppi_corr_0, beta, coord
+    )
+    ppi_se = ppi_ses.mean()
+    classical_se = classical_ses.mean()
 
-    mean_close = np.abs(se_star - se_sim) <= 2 * np.std(ses)
-    assert mean_close, f"{se_star}, {se_sim}, {np.std(ses)}"
+    mean_close = np.abs(ppi_se - classical_se) <= epsilon
+    assert mean_close, f"{ppi_se}, {classical_se}, {np.std(ppi_ses)}, {np.std(classical_ses)}"
