@@ -33,15 +33,16 @@ def ppi_power(
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
-            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+        dict: Dictionary containing the following items:
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective number of samples as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+            - ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `effective_n` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
+
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
 
     """
@@ -144,12 +145,12 @@ def _get_powerful_pair(
         n_max (int, optional): Maximum number of samples allowed. If provided, the optimal pair will satisfy n + N <= n_max.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size.
-            ppi_corr (float): PPI correlation.
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size.
+            - ppi_corr (float): PPI correlation.
     """
 
     n0 = budget / ppi_cost
@@ -218,12 +219,12 @@ def _get_cheap_pair(
 
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size.
-            ppi_corr (float): PPI correlation.
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size.
+            - ppi_corr (float): PPI correlation.
 
     Notes:
         If effective_n > n_max, then there is no pair of sample sizes (n, N) with n + N <= n_max that has a standard error of se or smaller. In this case, the function will give a warning and will return n = n_max and N = 0. This is the most powerful pair of sample sizes that can be achieved with n_max unlabeled samples.
@@ -289,12 +290,12 @@ def _optimal_pair(n0, ppi_corr, gamma, cost_X, cost_Y, cost_Yhat):
         cost_Yhat (float): Cost per prediction.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size.
-            ppi_corr (float): PPI correlation.
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size.
+            - ppi_corr (float): PPI correlation.
     """
     ppi_corr_sq = ppi_corr**2
     n = n0 * (
@@ -350,15 +351,16 @@ def ppi_mean_power(
         w (ndarray, optional): Sample weights for the labeled data set. Defaults to all ones vector.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
-            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+            - ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `effective_n` must be provided. If both are provided, `budget` will be used and the most powerful pair will be returned.
+
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
@@ -478,15 +480,16 @@ def ppi_ols_power(
         w (ndarray, optional): Sample weights for the labeled data set.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
-            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+            - ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
 
     Notes:
         At least one of `budget` and `effective_n` must be provided. If both are provided, `budget` will be used.
+
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
@@ -549,15 +552,16 @@ def ppi_logistic_power(
         w (ndarray, optional): Sample weights for the labeled data set.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size as defined in`[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
-            ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size as defined in`[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
+            - ppi_corr (float): PPI correlation as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__
 
     Notes:
         At least one of `budget` and `effective_n` must be provided. If both are provided, `budget` will be used.
+
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
@@ -630,15 +634,16 @@ def ppi_poisson_power(
         w (ndarray, optional): Sample weights for the labeled data set.
 
     Returns:
-        Dictionary: containing the following items
-            n (int): Optimal number of gold-labeled samples.
-            N (int): Optimal number of unlabeled samples.
-            cost (float): Total cost.
-            effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
-            ppi_corr (float): PPI correlation `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+        dict: Dictionary containing the following items
+            - n (int): Optimal number of gold-labeled samples.
+            - N (int): Optimal number of unlabeled samples.
+            - cost (float): Total cost.
+            - effective_n (int): Effective sample size as defined in `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
+            - ppi_corr (float): PPI correlation `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__.
 
     Notes:
         At least one of `budget` and `effective_n` must be provided. If both are provided, `budget` will be used.
+
         `[BHvL24] <https://osf.io/preprints/socarxiv/j3bnt>`__ Broska, D., Howes, M., & van Loon, A. (2024, August 22). The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations. https://doi.org/10.31235/osf.io/j3bnt
     """
     if budget is None and effective_n is None:
