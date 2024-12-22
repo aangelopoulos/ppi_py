@@ -16,3 +16,5 @@ Each notebook runs a simulation that forms a dataframe containing confidence int
 - the average interval width for PPI and the classical method, together with a scatterplot of the widths from the five random draws.
 
 Each notebook also compares PPI and classical inference in terms of the number of labeled examples needed to reject a natural null hypothesis in the analyzed problem.
+
+Finally, there is a notebook that shows how to compute the optimal `n` and `N` given a cost constraint ([```power_analysis.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/power_analysis.ipynb)).
