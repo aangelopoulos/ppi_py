@@ -35,6 +35,7 @@ To install the package, run the following code!
    ppi
    crossppi
    baselines
+   ppi_power_analysis
 
 Indices and tables:
 
