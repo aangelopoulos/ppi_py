@@ -101,3 +101,7 @@ The repository currently implements the methods developed in the following paper
 `PPI++: Efficient Prediction-Powered Inference <https://arxiv.org/abs/2311.01453>`_
 
 `Cross-Prediction-Powered Inference <https://arxiv.org/abs/2309.16598>`_
+
+`Prediction-Powered Bootstrap <https://arxiv.org/abs/2405.18379>`_
+
+`The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations <https://osf.io/preprints/socarxiv/j3bnt>`_`
