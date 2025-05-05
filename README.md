@@ -143,4 +143,4 @@ The repository currently implements the methods developed in the following paper
 
 [Prediction-Powered Bootstrap](https://arxiv.org/abs/2405.18379)
 
-[The Mixed Subjects Design: Treating Large Language Models as  (Potentially) Informative Observations](https://osf.io/preprints/socarxiv/j3bnt)
+[The Mixed Subjects Design: Treating Large Language Models as Potentially Informative Observations](https://doi.org/10.1177/00491241251326865)
