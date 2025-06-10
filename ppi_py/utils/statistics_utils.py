@@ -64,7 +64,7 @@ def safe_expit(x):
     """Computes the sigmoid function in a numerically stable way."""
     return np.exp(-np.logaddexp(0, -x))
 
-
+@njit
 def safe_log1pexp(x):
     """
     Compute log(1 + exp(x)) in a numerically stable way.

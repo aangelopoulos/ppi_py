@@ -90,6 +90,16 @@ def ppi_poisson_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
     return includeds
 
 
+def test_ppi_poisson_ci():
+    n = 1000
+    N = 10000
+    d = 3
+    alphas = np.array([0.05])
+    epsilon = 0.4
+    total_includeds = np.zeros(len(alphas))
+    result = ppi_poisson_ci_subtest(0, alphas, n, N, d, epsilon)
+    
+
 def test_ppi_poisson_ci_parallel():
     n = 1000
     N = 10000

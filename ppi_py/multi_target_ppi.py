@@ -5,77 +5,72 @@
 
 from typing import Optional, Union, Tuple
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from collections.abc import Callable
 from enum import Enum
 from scipy.optimize import minimize
 from .utils import reshape_to_2d, calc_lam_glm
 from functools import partial
+from statsmodels.stats.weightstats import (_zconfint_generic, _zstat_generic,
+                                           _zstat_generic2)
 
-def ppi_multi_convex_pointest(X: ArrayLike,
-                              Xhat: ArrayLike,
-                              Xhat_unlabeled: ArrayLike,
-                              initial_params: ArrayLike,
-                              loss: Callable[[ArrayLike,
-                                              ArrayLike,
-                                              Optional[ArrayLike]],
-                                             float],
-                              gradient: Callable[[ArrayLike,
-                                                  ArrayLike,
-                                                  Optional[ArrayLike]],
-                                                 float],
-                              hessian: Optional[Callable[[ArrayLike,
-                                                          ArrayLike,
-                                                          Optional[ArrayLike]],
-                                                         np.ndarray]],
-                              get_stats: Callable[[np.ndarray,
-                                                   np.ndarray,
-                                                   np.ndarray,
-                                                   Optional[np.ndarray],
-                                                   Optional[np.ndarray]],
-                                                  [Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
-                                                  ],
-                              lam: Optional[float] = None,
-                              coord: Optional[int] = None,
-                              w: Optional[ArrayLike] = None,
-                              w_unlabeled: Optional[ArrayLike] = None,
-                              **kwargs,
-                              ) -> Tuple[np.ndarray, float]:
-    """Computes the prediction-powered point estimate for a model with the given loss, gradient, and hessian using the PPI++ algorithm.
+
+def ppi_multi_glm_pointest(Y: NDArray,
+                           X: NDArray,
+                           Yhat: NDArray,
+                           Xhat: NDArray,
+                           Yhat_unlabeled: NDArray,
+                           Xhat_unlabeled: NDArray,
+                           initial_params: NDArray,
+                           loss: Callable[[NDArray,
+                                           NDArray,
+                                           Optional[NDArray]],
+                                          float],
+                           gradient: Callable[[NDArray,
+                                               Union[NDArray, float],
+                                               Union[NDArray,float]],
+                                              float],
+                           get_stats: Callable[[NDArray,
+                                                NDArray,
+                                                NDArray,
+                                                NDArray,
+                                                NDArray,
+                                                NDArray,
+                                                Optional[NDArray],
+                                                Optional[NDArray]],
+                                               [Tuple[NDArray, NDArray, NDArray, NDArray]]
+                                               ],
+                           lam: Optional[float] = None,
+                           coord: Optional[int] = None,
+                           w: Optional[ArrayLike] = None,
+                           w_unlabeled: Optional[ArrayLike] = None,
+                           return_lam: Optional[bool] = False,
+                           **kwargs,
+                           ) -> Tuple[NDArray, float]:
+    """Computes the prediction-powered point estimate for a model with the given loss, gradient, and  using the PPI++ algorithm.
 
     Args:
-    X (ArrayLike): Gold-standard label data (columns are variables; rows are observations).
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
     Xhat (ArrayLike): Predictions corresponding to gold-standard labels
     Xhat_unlabeled (ArrayLike): Data without labels, only predictions
     initial_params (ArrayLike): Initial parameters.
     loss (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the loss, optionally accepting weights
     gradient (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the subgradient of the loss with respect to the parameters, optionally accepting weights.
-    hessian (function ArrayLike, ArrayLike, Optional[ArrayLike] -> ndarray): Function for evaluating the hessian of the loss; used for choosing power tuning parameter.
     get_stats: Function for getting statistics needed to calculate a CI. 
     alternative (string, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
     lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
     coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
     w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
     w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+    return_lam (bool, optional): whether to return a tuple including lam
     ** kwargs: passed through to minimize
 
     Returns:
        tuple(ndarray, float): (point estimate for the parameters, lam used)
 
     """
-
-    if hessian is None and lam is None:
-        raise ValueError("""Either hessian or lam is required.
-        If lam isn't provided, hessian is used to choose it""")
-
-    X = np.array(X)
-    Xhat_unlabeled = np.array(Xhat_unlabeled)
-    Xhat = np.array(Xhat)
-    w = np.array(w)
-    w_unlabeled = np.array(w_unlabeled)
-    
     n = X.shape[0] # No. labels
-    d = X.shape[1] # No. variables
+    d = initial_params.shape[0] # No. variables
     N = Xhat_unlabeled.shape[0] # No. unlabeled
     w = np.ones(n) if w is None else w / w.sum() * n
 
@@ -87,10 +82,12 @@ def ppi_multi_convex_pointest(X: ArrayLike,
 
     lam_curr = 1 if lam is None else lam
 
-    # Initialize theta with the gold-standard data
+    ## make contiguous arrays for GLM.
+    ## memory inefficient.
 
+    # Initialize theta with the gold-standard data
     theta = minimize(loss,
-                     args=(X, w),
+                     args=(Y, X, w),
                      x0=initial_params,
                      jac=gradient,
                      **kwargs).x
@@ -100,20 +97,20 @@ def ppi_multi_convex_pointest(X: ArrayLike,
         return (
             lam_curr
             / N
-            * loss(_theta, Xhat_unlabeled, w_unlabeled)
+            * loss(_theta, Yhat_unlabeled, Xhat_unlabeled, w_unlabeled)
             - lam_curr
             / n
-            * loss(_theta, Xhat, w)
-            + 1 / n * loss(_theta, X, w))
+            * loss(_theta, Yhat, Xhat, w)
+            + 1 / n * loss(_theta, Y, X, w))
 
     def rectified_grad(_theta):
         # Correct the gradient
         return (
             lam_curr
             / N
-            * gradient(_theta, Xhat_unlabeled, w_unlabeled)
-            - lam_curr / n * gradient(_theta, Xhat, w)
-            + 1 / n * gradient(_theta, X, w)
+            * gradient(_theta, Yhat_unlabeled, Xhat_unlabeled, w_unlabeled)
+            - lam_curr / n * gradient(_theta, Yhat, Xhat, w)
+            + 1 / n * gradient(_theta, Y, X, w)
         )
 
     pointest = minimize(rectified_loss,
@@ -122,54 +119,74 @@ def ppi_multi_convex_pointest(X: ArrayLike,
                         **kwargs).x
 
     if lam is None:
-        lam = _calc_lam_multi(X=X,
+        lam = _calc_lam_multi(Y=Y,
+                              X=X,
+                              Yhat=Yhat,
                               Xhat=Xhat,
+                              Yhat_unlabeled=Yhat_unlabeled,
                               Xhat_unlabeled=Xhat_unlabeled,
                               pointest=pointest,
                               gradient=gradient,
-                              hessian=hessian,
                               get_stats=get_stats,
                               coord=coord,
                               clip=True,
                               w=w,
                               w_unlabeled=w_unlabeled)
 
-        return ppi_multi_convex_pointest(X=X,
-                                          Xhat=Xhat,
-                                          Xhat_unlabeled=Xhat_unlabeled,
-                                          initial_params=pointest,
-                                          loss=loss,
-                                          gradient=gradient,
-                                          hessian=hessian,
-                                          get_stats=get_stats,
-                                          lam=lam,
-                                          coord=coord,
-                                          w=w,
-                                          w_unlabeled=w_unlabeled,
-                                          **kwargs), lam
+        return ppi_multi_glm_pointest(Y=Y,
+                                      X=X,
+                                      Yhat=Yhat,
+                                      Xhat=Xhat,
+                                      Yhat_unlabeled=Yhat_unlabeled,
+                                      Xhat_unlabeled=Xhat_unlabeled,
+                                      initial_params=pointest,
+                                      loss=loss,
+                                      gradient=gradient,
+                                      get_stats=get_stats,
+                                      lam=lam,
+                                      coord=coord,
+                                      w=w,
+                                      w_unlabeled=w_unlabeled,
+                                      return_lam=return_lam,
+                                      **kwargs)
 
     else:
-        return pointest, lam
+        if return_lam:
+            return pointest, lam
+        else:
+            return pointest
 
-def ppi_multi_convex_pval(X: ArrayLike,
-                        Xhat: ArrayLike,
-                        Xhat_unlabeled: ArrayLike,
-                        pointest: ArrayLike,
-                        gradient: Callable[[ArrayLike,
-                                            ArrayLike,
-                                            Optional[ArrayLike]],
+
+def ppi_multi_glm_pval(Y: NDArray,
+                       X: NDArray,
+                       Yhat: NDArray,
+                       Xhat: NDArray,
+                       Yhat_unlabeled: NDArray,
+                       Xhat_unlabeled: NDArray,
+                       initial_params: NDArray,
+                       loss: Callable[[NDArray,
+                                       NDArray,
+                                       Optional[NDArray]],
+                                      float],
+                       gradient: Callable[[NDArray,
+                                            NDArray,
+                                            Optional[NDArray]],
                                            float],
-                        hessian: Optional[Callable[[ArrayLike,
-                                                    ArrayLike,
-                                                    Optional[ArrayLike]],
-                                                   np.ndarray]] = None,
-                        alpha: Optional[float] = 0.95,
+                       get_stats: Callable[[NDArray,
+                                             NDArray,
+                                             NDArray,
+                                             NDArray,
+                                             NDArray,
+                                             NDArray,
+                                             Optional[NDArray],
+                                             Optional[NDArray]],
+                                            [Tuple[NDArray, NDArray, NDArray, NDArray]]
+                                            ],                        
                         alternative: Optional[str] = "two-sided",
                         lam: Optional[float] = None,
                         coord: Optional[int] = None,
                         w: Optional[ArrayLike] = None,
                         w_unlabeled: Optional[ArrayLike] = None,
-                        *args,
                         **kwargs):
 
     """Computes the pvalues for a model with the given gradient and hessian using the PPI++ algorithm.
@@ -181,8 +198,7 @@ def ppi_multi_convex_pval(X: ArrayLike,
     initial_params (ArrayLike): Initial parameters.
     loss (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the loss, optionally accepting weights
     gradient (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the subgradient of the loss with respect to the parameters, optionally accepting weights.
-    hessian (function ArrayLike, ArrayLike, Optional[ArrayLike] -> ndarray): Function for evaluating the hessian of the loss; used for choosing power tuning parameter.
-    alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+    get_stats: Function for getting statistics needed to calculate a CI. 
     alternative (string, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
     lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
     coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
@@ -196,44 +212,40 @@ def ppi_multi_convex_pval(X: ArrayLike,
 
     """
 
-    pointest = np.ndarray(pointest)
-    X = np.ndarray(X)
-    Xhat = np.ndarray(Xhat)
-    Xhat_unlabeled = np.ndarray(Xhat_unlabeled)
-    n =     n = X.shape[0]
-    d = X.shape[1]
+    n = X.shape[0]
+    d = initial_params.shape[0]
     N = Xhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
 
     ### This is the correct pointest with chosen or optimal lam
-    pointest, lam = ppi_multi_convex_pointest(X,
+    ppi_pointest, lam = ppi_multi_glm_pointest(Y,
+                                               X,
+                                               Yhat,
                                                Xhat,
+                                               Yhat_unlabeled,
                                                Xhat_unlabeled,
                                                initial_params,
                                                loss,
                                                gradient,
-                                               hessian, 
                                                get_stats,
                                                lam=lam,
                                                coord=coord,
                                                w=w,
                                                w_unlabeled=w_unlabeled,
-                                               *args,
+                                               return_lam=True,
                                                **kwargs
                                                )
 
     # Note that we need a new inv_hessian with the correct point estimate, even though we used a hessian to choose lam.
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(pointest,
-                                                                   X,
-                                                                   Xhat,
-                                                                   Xhat_unlabeled,
-                                                                   w,
-                                                                   w_unlabeled)
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(pointest=ppi_pointest,
+                                                                   Y=Y,
+                                                                   X=X,
+                                                                   Yhat=Yhat,
+                                                                   Xhat=Xhat,
+                                                                   Yhat_unlabeled=Yhat_unlabeled,
+                                                                   Xhat_unlabeled=Xhat_unlabeled,
+                                                                   w=w,
+                                                                   w_unlabeled=w_unlabeled)
+                                                                   
 
     var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
     var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
@@ -246,43 +258,48 @@ def ppi_multi_convex_pval(X: ArrayLike,
     )[1]
     return pvals
 
-def ppi_multi_convex_ci(X: ArrayLike,
-                        Xhat: ArrayLike,
-                        Xhat_unlabeled: ArrayLike,
-                        pointest: ArrayLike,
-                        gradient: Callable[[np.ndarray,
-                                            np.ndarray,
-                                            np.ndarray],
-                                           float],
-                        hessian: Callable[[np.ndarray,
-                                           np.ndarray,
-                                           Optional[np.ndarray]],
-                                          np.ndarray],
-                        get_stats: Callable[[np.ndarray,
-                                             np.ndarray,
-                                             np.ndarray,
-                                             Optional[np.ndarray],
-                                             Optional[np.ndarray]],
-                                             [Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
-                                            ],
-                        alpha: Optional[float] = 0.95,
-                        alternative: Optional[str] = "two-sided",
-                        lam: Optional[float] = None,
-                        coord: Optional[int] = None,
-                        w: Optional[ArrayLike] = None,
-                        w_unlabeled: Optional[ArrayLike] = None,
-                        *args,
-                        **kwargs):
+
+def ppi_multi_glm_ci(Y: NDArray,
+                     X: NDArray,
+                     Yhat: NDArray,
+                     Xhat: NDArray,
+                     Yhat_unlabeled: NDArray,
+                     Xhat_unlabeled: NDArray,
+                     initial_params: NDArray,
+                     loss: Callable[[NDArray,
+                                     NDArray,
+                                     Optional[NDArray]],
+                                    float],
+                     gradient: Callable[[NDArray,
+                                         NDArray,
+                                         NDArray],
+                                        float],
+                     get_stats: Callable[[NDArray,
+                                          NDArray,
+                                          NDArray,
+                                          NDArray,
+                                          NDArray,
+                                          NDArray,
+                                          Optional[NDArray],
+                                          Optional[NDArray]],
+                                         [Tuple[NDArray, NDArray, NDArray, NDArray]]
+                                         ],
+                     alpha: Optional[float] = 0.95,
+                     alternative: Optional[str] = "two-sided",
+                     lam: Optional[float] = None,
+                     coord: Optional[int] = None,
+                     w: Optional[ArrayLike] = None,
+                     w_unlabeled: Optional[ArrayLike] = None,
+                     **kwargs):
     """Computes the confidence interval for a model with the given gradient and hessian using the PPI++ algorithm.
 
     Args:
     X (ArrayLike): Gold-standard label data (columns are variables; rows are observations).
     Xhat (ArrayLike): Predictions corresponding to gold-standard labels
     Xhat_unlabeled (ArrayLike): Data without labels, only predictions
-    initial_params (ArrayLike): Initial parameters.
+    pointest (ArrayLike): the point estimate.
     loss (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the loss, optionally accepting weights
     gradient (function ArrayLike, ArrayLike, Optional[ArrayLike] -> float): Function calculating the subgradient of the loss with respect to the parameters, optionally accepting weights.
-    hessian (function ArrayLike, ArrayLike, Optional[ArrayLike] -> ndarray): Function for evaluating the hessian of the loss; used for choosing power tuning parameter.
     get_stats: Function for calculating statistics for the confidence 
     alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
     alternative (string, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
@@ -297,44 +314,37 @@ def ppi_multi_convex_ci(X: ArrayLike,
        tuple(ndarray, ndarray, ndarray): (point estimate, CI upper bound, CI lower bound) for the parameters
 
     """
-
-    pointest = np.ndarray(pointest)
-    X = np.ndarray(X)
-    Xhat = np.ndarray(Xhat)
-    Xhat_unlabeled = np.ndarray(Xhat_unlabeled)
-    n =     n = X.shape[0]
-    d = X.shape[1]
+    n = X.shape[0]
+    d = initial_params.shape[0]
     N = Xhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
 
     ### This is the correct pointest with chosen or optimal lam
-    pointest, lam = ppi_multi_convex_pointest(X,
-                                              Xhat,
-                                              Xhat_unlabeled,
-                                              initial_params,
-                                              loss,
-                                              gradient,
-                                              hessian, 
-                                              get_stats,
-                                              lam=lam,
-                                              coord=coord,
-                                              w=w,
-                                              w_unlabeled=w_unlabeled,
-                                              *args,
-                                              **kwargs
-                                               )
+    ppi_pointest, lam = ppi_multi_glm_pointest(Y,
+                                               X,
+                                               Yhat,
+                                               Xhat,
+                                               Yhat_unlabeled,
+                                               Xhat_unlabeled,
+                                               initial_params,
+                                               loss,
+                                               gradient,
+                                               get_stats,
+                                               lam=lam,
+                                               coord=coord,
+                                               w=w,
+                                               w_unlabeled=w_unlabeled,
+                                               return_lam = True,
+                                               **kwargs
+                                           )
 
     # Note that we need a new inv_hessian with the correct point estimate, even though we used a hessian to choose lam.
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(X,
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(ppi_pointest,
+                                                                   Y,
+                                                                   X,
+                                                                   Yhat,
                                                                    Xhat,
+                                                                   Yhat_unlabeled,
                                                                    Xhat_unlabeled,
-                                                                   pointest,
                                                                    w,
                                                                    w_unlabeled)
     var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
@@ -347,27 +357,29 @@ def ppi_multi_convex_ci(X: ArrayLike,
         alternative=alternative,
     )
 
-def _calc_lam_multi(X: np.ndarray,
-                    Xhat: np.ndarray,
-                    Xhat_unlabeled: np.ndarray,
-                    pointest: np.ndarray,
+def _calc_lam_multi(Y: NDArray,
+                    X: NDArray,
+                    Yhat: NDArray,
+                    Xhat: NDArray,
+                    Yhat_unlabeled: NDArray,
+                    Xhat_unlabeled: NDArray,
+                    pointest: NDArray,
                     gradient: Callable[[ArrayLike,
                                         ArrayLike,
                                         ArrayLike],
                                        float],
-                    hessian: Callable[[ArrayLike,
-                                       ArrayLike,
-                                       ArrayLike],
-                                      np.ndarray],
                     get_stats,
                     coord,
                     clip,
-                    w: np.ndarray,
-                    w_unlabeled: np.ndarray) -> float:
+                    w: NDArray,
+                    w_unlabeled: NDArray) -> float:
 
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(pointest,
+                                                                   Y,
                                                                    X,
+                                                                   Yhat,
                                                                    Xhat,
+                                                                   Yhat_unlabeled,
                                                                    Xhat_unlabeled,
                                                                    w,
                                                                    w_unlabeled)
