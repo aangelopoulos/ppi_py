@@ -25,7 +25,7 @@ def test_ppi_logistic_pointestimate_debias():
         X_unlabeled.dot(beta_prediction) + np.random.randn(N)
     )
     # Compute the point estimate
-    beta_ppi_pointestimate = ppi_logistic_pointestimate(
+    beta_ppi_pointestimate, lam = ppi_logistic_pointestimate(
         X,
         (Y > 0.5).astype(int),
         Yhat,

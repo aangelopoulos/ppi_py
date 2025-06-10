@@ -24,8 +24,14 @@ from .utils import (
     form_discrete_distribution,
     reshape_to_2d,
     bootstrap,
+    calc_lam_glm
+    
 )
-
+from .multi_target_ppi import (
+    ppi_multi_convex_ci,
+    ppi_multi_convex_pval,
+    ppi_multi_convex_pointest
+)
 
 def rectified_p_value(
     rectifier,
@@ -108,7 +114,7 @@ def ppi_mean_pointestimate(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -187,7 +193,7 @@ def ppi_mean_ci(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -278,7 +284,7 @@ def ppi_mean_pval(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -613,7 +619,7 @@ def ppi_ols_pointestimate(
             w_unlabeled=w_unlabeled,
             use_unlabeled=use_unlabeled,
         )
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -692,6 +698,8 @@ def ppi_ols_ci(
         w=w,
         w_unlabeled=w_unlabeled,
     )
+
+
     grads, grads_hat, grads_hat_unlabeled, inv_hessian = _ols_get_stats(
         ppi_pointest,
         X.astype(float),
@@ -705,7 +713,7 @@ def ppi_ols_ci(
     )
 
     if lam is None:
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -747,6 +755,76 @@ def ppi_ols_ci(
 """
 
 
+def logistic_loss(_theta, X_multi, w):
+    Y = X_multi[:,0]
+    X = X_multi[:,1:]
+    return np.sum(w * ( -Y * (X @ _theta) + safe_log1pexp(X @ _theta)))
+    
+
+def logistic_gradient(_theta, X_multi, w):
+    Y = X_multi[:,0]
+    X = X_multi[:,1:]
+    return X.T @ (w * (safe_expit(X @ _theta) - Y))
+
+
+def logistic_hessian(_theta, X_multi, w):
+    Y = X_multi[:,0]
+    X = X_multi[:,1:]
+    d = X.shape[1]
+    n = Y.shape[0]
+    hessian = np.zeros((d, d))
+    mu = safe_expit(X @ _theta)
+    for i in range(n):
+        hessian += w[i] / n * mu[i] * (1 - mu[i]) * np.outer(X[i], X[i])
+    return hessian
+
+
+# def _logistic_get_stats(ppi_pointest, X, Y, Yhat, X_unlabeled, w, w_unlabeled):
+#     X, Xhat, Xhat_unlabeled = _ppi_glm_init(X,
+#                                            Y,
+#                                            Yhat,
+#                                            X_unlabeled,
+#                                            Yhat_unlabeled,
+#                                            w,
+#                                            w_unlabeled)
+#     return multi_get_stats(X,
+#                            Xhat,
+#                            Xhat_unlabeled,
+#                            ppi_pointest,
+#                            logistic_gradient,
+#                            logistic_hessian,
+#                            w,
+#                            w_unlabeled)
+
+def _ppi_glm_init(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        w=None,
+        w_unlabeled=None,
+        optimizer_options=None):
+    
+    X_multi = np.column_stack((Y,X))
+    Xhat_multi = np.column_stack((Yhat,X))
+    Xhat_unlabeled = np.column_stack((Yhat_unlabeled, X_unlabeled))
+    n = Y.shape[0]
+    N = Yhat_unlabeled.shape[0]
+    w = np.ones(n) if w is None else w / w.sum() * n
+    w_unlabeled = (
+        np.ones(N)
+        if w_unlabeled is None
+        else w_unlabeled / w_unlabeled.sum() * N
+    )
+    if optimizer_options is None:
+        optimizer_options = {"ftol": 1e-15}
+    if "ftol" not in optimizer_options.keys():
+        optimizer_options["ftol"] = 1e-15
+
+    return X_multi, Xhat_multi, Xhat_unlabeled, w, w_unlabeled, optimizer_options
+
+
 def ppi_logistic_pointestimate(
     X,
     Y,
@@ -779,20 +857,16 @@ def ppi_logistic_pointestimate(
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
-    if optimizer_options is None:
-        optimizer_options = {"ftol": 1e-15}
-    if "ftol" not in optimizer_options.keys():
-        optimizer_options["ftol"] = 1e-15
 
+    X_multi, Xhat_multi, Xhat_unlabeled_multi, w, w_unlabeled, optimizer_options = _ppi_glm_init(X,
+                                                                                                Y,
+                                                                                                Yhat,
+                                                                                                X_unlabeled,
+                                                                                                Yhat_unlabeled,
+                                                                                                w,
+                                                                                                w_unlabeled,
+                                                                                                optimizer_options
+                                                                                                )
     # Initialize theta
     theta = (
         LogisticRegression(
@@ -808,99 +882,34 @@ def ppi_logistic_pointestimate(
     if len(theta.shape) == 0:
         theta = theta.reshape(1)
 
-    lam_curr = 1 if lam is None else lam
+    ppi_pointest, _ = ppi_multi_convex_pointest(X_multi,
+                                                Xhat_multi,
+                                                Xhat_unlabeled_multi,
+                                                theta,
+                                                logistic_loss,
+                                                logistic_gradient,
+                                                logistic_hessian,
+                                                get_stats =_logistic_get_stats,
+                                                lam = lam,
+                                                coord = None,
+                                                w = w,
+                                                w_unlabeled = w_unlabeled,
+                                                method="L-BFGS-B",
+                                                tol=1e-15,
+                                                options=optimizer_options)
 
-    def rectified_logistic_loss(_theta):
-        return (
-            lam_curr
-            / N
-            * np.sum(
-                w_unlabeled
-                * (
-                    -Yhat_unlabeled * (X_unlabeled @ _theta)
-                    + safe_log1pexp(X_unlabeled @ _theta)
-                )
-            )
-            - lam_curr
-            / n
-            * np.sum(w * (-Yhat * (X @ _theta) + safe_log1pexp(X @ _theta)))
-            + 1
-            / n
-            * np.sum(w * (-Y * (X @ _theta) + safe_log1pexp(X @ _theta)))
-        )
-
-    def rectified_logistic_grad(_theta):
-        return (
-            lam_curr
-            / N
-            * X_unlabeled.T
-            @ (
-                w_unlabeled
-                * (safe_expit(X_unlabeled @ _theta) - Yhat_unlabeled)
-            )
-            - lam_curr / n * X.T @ (w * (safe_expit(X @ _theta) - Yhat))
-            + 1 / n * X.T @ (w * (safe_expit(X @ _theta) - Y))
-        )
-
-    ppi_pointest = minimize(
-        rectified_logistic_loss,
-        theta,
-        jac=rectified_logistic_grad,
-        method="L-BFGS-B",
-        tol=optimizer_options["ftol"],
-        options=optimizer_options,
-    ).x
-
-    if lam is None:
-        (
-            grads,
-            grads_hat,
-            grads_hat_unlabeled,
-            inv_hessian,
-        ) = _logistic_get_stats(
-            ppi_pointest,
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            w,
-            w_unlabeled,
-        )
-        lam = _calc_lam_glm(
-            grads,
-            grads_hat,
-            grads_hat_unlabeled,
-            inv_hessian,
-            clip=True,
-        )
-        return ppi_logistic_pointestimate(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            optimizer_options=optimizer_options,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-        )
-    else:
-        return ppi_pointest
+    return ppi_pointest
 
 
-@njit
+#@njit
 def _logistic_get_stats(
-    pointest,
-    X,
-    Y,
-    Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
-    w=None,
-    w_unlabeled=None,
-    use_unlabeled=True,
+        pointest,
+        X,
+        Xhat,
+        Xhat_unlabeled,
+        w=None,
+        w_unlabeled=None,
+        use_unlabeled=True,
 ):
     """Computes the statistics needed for the logistic regression confidence interval.
 
@@ -921,6 +930,11 @@ def _logistic_get_stats(
         grads_hat_unlabeled (ndarray): Gradient of the loss function on the unlabeled predictions.
         inv_hessian (ndarray): Inverse Hessian of the loss function on the unlabeled data.
     """
+    Y = X[:,0]
+    X = X[:,1:]
+    Yhat = Xhat[:,0]
+    Yhat_unlabeled = Xhat_unlabeled[:,0]
+    X_unlabeled = Xhat_unlabeled[:,1:]
     n = Y.shape[0]
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
@@ -1000,18 +1014,21 @@ def ppi_logistic_pval(
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
-    use_unlabeled = lam != 0
 
-    ppi_pointest = ppi_logistic_pointestimate(
+    X_multi,
+    Xhat_multi,
+    Xhat_unlabeled_multi,
+    w, w_unlabeled,
+    optimizer_options = _ppi_glm_init(X,
+                                      Y,
+                                      Yhat,
+                                      X_unlabeled,
+                                      w,
+                                      w_unlabeled,
+                                      optimizer_options
+                                      )
+
+    ppi_pointest, lam = ppi_logistic_pointestimate(
         X,
         Y,
         Yhat,
@@ -1024,53 +1041,19 @@ def ppi_logistic_pval(
         w_unlabeled=w_unlabeled,
     )
 
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(
-        ppi_pointest,
-        X,
-        Y,
-        Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
-        w,
-        w_unlabeled,
-        use_unlabeled=use_unlabeled,
-    )
-
-    if lam is None:
-        lam = _calc_lam_glm(
-            grads,
-            grads_hat,
-            grads_hat_unlabeled,
-            inv_hessian,
-            clip=True,
-        )
-        return ppi_logistic_pval(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            optimizer_options=optimizer_options,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-            alternative=alternative,
-        )
-
-    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
-    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
-    Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
-
-    var_diag = np.sqrt(np.diag(Sigma_hat) / n)
-
-    pvals = _zstat_generic2(
-        ppi_pointest,
-        var_diag,
-        alternative=alternative,
-    )[1]
-    return pvals
-
+    return ppi_multi_convex_pval(X_multi,
+                                 Xhat_multi,
+                                 Xhat_unlabeled,
+                                 pointest,
+                                 logistic_gradient,
+                                 logistic_hessian,
+                                 _logistic_get_stats,
+                                 alpha,
+                                 alternative,
+                                 lam,
+                                 coord,
+                                 w,
+                                 w_unlabeled)
 
 def ppi_logistic_ci(
     X,
@@ -1108,18 +1091,16 @@ def ppi_logistic_ci(
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
-    n = Y.shape[0]
-    d = X.shape[1]
-    N = Yhat_unlabeled.shape[0]
-    w = np.ones(n) if w is None else w / w.sum() * n
-    w_unlabeled = (
-        np.ones(N)
-        if w_unlabeled is None
-        else w_unlabeled / w_unlabeled.sum() * N
-    )
-    use_unlabeled = lam != 0
+    X_multi, Xhat_multi, Xhat_unlabeled_multi, w, w_unlabeled, optimizer_options = _ppi_glm_init(X,
+                                                                                                Y,
+                                                                                                Yhat,
+                                                                                                X_unlabeled,
+                                                                                                w,
+                                                                                                w_unlabeled,
+                                                                                                optimizer_options
+                                                                                                )
 
-    ppi_pointest = ppi_logistic_pointestimate(
+    ppi_pointest, lam = ppi_logistic_pointestimate(
         X,
         Y,
         Yhat,
@@ -1132,53 +1113,19 @@ def ppi_logistic_ci(
         w_unlabeled=w_unlabeled,
     )
 
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = _logistic_get_stats(
-        ppi_pointest,
-        X,
-        Y,
-        Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
-        w,
-        w_unlabeled,
-        use_unlabeled=use_unlabeled,
-    )
-    if lam is None:
-        lam = _calc_lam_glm(
-            grads,
-            grads_hat,
-            grads_hat_unlabeled,
-            inv_hessian,
-            clip=True,
-        )
-        return ppi_logistic_ci(
-            X,
-            Y,
-            Yhat,
-            X_unlabeled,
-            Yhat_unlabeled,
-            alpha=alpha,
-            optimizer_options=optimizer_options,
-            alternative=alternative,
-            lam=lam,
-            coord=coord,
-            w=w,
-            w_unlabeled=w_unlabeled,
-        )
-
-    var_unlabeled = np.cov(lam * grads_hat_unlabeled.T).reshape(d, d)
-
-    var = np.cov(grads.T - lam * grads_hat.T).reshape(d, d)
-
-    Sigma_hat = inv_hessian @ (n / N * var_unlabeled + var) @ inv_hessian
-
-    return _zconfint_generic(
-        ppi_pointest,
-        np.sqrt(np.diag(Sigma_hat) / n),
-        alpha=alpha,
-        alternative=alternative,
-    )
-
+    return ppi_multi_convex_ci(X_multi,
+                               Xhat_multi,
+                               Xhat_unlabeled,
+                               pointest,
+                               logistic_gradient,
+                               logistic_hessian,
+                               _logistic_get_stats,
+                               alpha,
+                               alternative,
+                               lam,
+                               coord,
+                               w,
+                               w_unlabeled)
 
 def ppi_poisson_pointestimate(
     X,
@@ -1213,6 +1160,7 @@ def ppi_poisson_pointestimate(
     d = X.shape[1]
     N = Yhat_unlabeled.shape[0]
     w = np.ones(n) if w is None else w / w.sum() * n
+
     w_unlabeled = (
         np.ones(N)
         if w_unlabeled is None
@@ -1292,7 +1240,7 @@ def ppi_poisson_pointestimate(
             w,
             w_unlabeled,
         )
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -1436,7 +1384,6 @@ def ppi_poisson_ci(
         else w_unlabeled / w_unlabeled.sum() * N
     )
     use_unlabeled = lam != 0
-
     ppi_pointest = ppi_poisson_pointestimate(
         X,
         Y,
@@ -1462,7 +1409,7 @@ def ppi_poisson_ci(
         use_unlabeled=use_unlabeled,
     )
     if lam is None:
-        lam = _calc_lam_glm(
+        lam = calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -1750,82 +1697,6 @@ def ppboot(
             "Alternative must be either 'two-sided', 'larger' or 'smaller'."
         )
 
-
-def _calc_lam_glm(
-    grads,
-    grads_hat,
-    grads_hat_unlabeled,
-    inv_hessian,
-    coord=None,
-    clip=False,
-    optim_mode="overall",
-):
-    """
-    Calculates the optimal value of lam for the prediction-powered confidence interval for GLMs.
-
-    Args:
-        grads (ndarray): Gradient of the loss function with respect to the parameter evaluated at the labeled data.
-        grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
-        grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
-        inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
-        coord (int, optional): Coordinate for which to optimize `lam`, when `optim_mode="overall"`.
-        If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
-        clip (bool, optional): Whether to clip the value of lam to be non-negative. Defaults to `False`.
-        optim_mode (ndarray, optional): Mode for which to optimize `lam`, either `overall` or `element`.
-        If `overall`, it optimizes the total variance over all coordinates, and the function returns a scalar.
-        If `element`, it optimizes the variance for each coordinate separately, and the function returns a vector.
-
-
-    Returns:
-        float: Optimal value of `lam`. Lies in [0,1].
-    """
-    grads = reshape_to_2d(grads)
-    grads_hat = reshape_to_2d(grads_hat)
-    grads_hat_unlabeled = reshape_to_2d(grads_hat_unlabeled)
-    n = grads.shape[0]
-    N = grads_hat_unlabeled.shape[0]
-    d = inv_hessian.shape[0]
-    if grads.shape[1] != d:
-        raise ValueError(
-            "Dimension mismatch between the gradient and the inverse Hessian."
-        )
-
-    grads_cent = grads - grads.mean(axis=0)
-    grad_hat_cent = grads_hat - grads_hat.mean(axis=0)
-    cov_grads = (1 / n) * (
-        grads_cent.T @ grad_hat_cent + grad_hat_cent.T @ grads_cent
-    )
-
-    var_grads_hat = np.cov(
-        np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
-    )
-    var_grads_hat = var_grads_hat.reshape(d, d)
-
-    vhat = inv_hessian if coord is None else inv_hessian[coord, :]
-    if optim_mode == "overall":
-        num = (
-            np.trace(vhat @ cov_grads @ vhat)
-            if coord is None
-            else vhat @ cov_grads @ vhat
-        )
-        denom = (
-            2 * (1 + (n / N)) * np.trace(vhat @ var_grads_hat @ vhat)
-            if coord is None
-            else 2 * (1 + (n / N)) * vhat @ var_grads_hat @ vhat
-        )
-        lam = num / denom
-        lam = lam.item()
-    elif optim_mode == "element":
-        num = np.diag(vhat @ cov_grads @ vhat)
-        denom = 2 * (1 + (n / N)) * np.diag(vhat @ var_grads_hat @ vhat)
-        lam = num / denom
-    else:
-        raise ValueError(
-            "Invalid value for optim_mode. Must be either 'overall' or 'element'."
-        )
-    if clip:
-        lam = np.clip(lam, 0, 1)
-    return lam
 
 
 """
