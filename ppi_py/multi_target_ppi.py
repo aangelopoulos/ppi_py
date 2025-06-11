@@ -508,6 +508,7 @@ def ppi_multi_glm_ci(
         alternative=alternative,
     )
 
+
 @njit
 def _glm_get_stats(
     link: Callable[[NDArray], NDArray],
@@ -560,7 +561,6 @@ def _glm_get_stats(
 
     inv_hessian = np.linalg.inv(hessian).reshape(d, d)
     return grads, grads_hat, grads_hat_unlabeled, inv_hessian
-
 
 
 def _calc_lam_multi(

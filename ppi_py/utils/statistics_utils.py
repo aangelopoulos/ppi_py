@@ -3,6 +3,7 @@ from numba import njit
 from scipy.stats import binom
 from scipy.optimize import brentq
 
+
 def bootstrap(data, statistic, n_resamples, paired="all", statistic_kwargs={}):
     """
     Bootstrap the given statistic on the data.
@@ -62,6 +63,7 @@ def reshape_to_2d(x):
 def safe_expit(x):
     """Computes the sigmoid function in a numerically stable way."""
     return np.exp(-np.logaddexp(0, -x))
+
 
 @njit
 def safe_log1pexp(x):
