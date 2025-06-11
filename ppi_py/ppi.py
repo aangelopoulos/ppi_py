@@ -120,7 +120,7 @@ def ppi_mean_pointestimate(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = calc_lam_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -199,7 +199,7 @@ def ppi_mean_ci(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = calc_lam_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -290,7 +290,7 @@ def ppi_mean_pval(
         grads_hat = w * (Yhat - ppi_pointest)
         grads_hat_unlabeled = w_unlabeled * (Yhat_unlabeled - ppi_pointest)
         inv_hessian = np.eye(d)
-        lam = calc_lam_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -625,7 +625,7 @@ def ppi_ols_pointestimate(
             w_unlabeled=w_unlabeled,
             use_unlabeled=use_unlabeled,
         )
-        lam = calc_lam_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,
@@ -718,7 +718,7 @@ def ppi_ols_ci(
     )
 
     if lam is None:
-        lam = calc_lam_glm(
+        lam = _calc_lam_glm(
             grads,
             grads_hat,
             grads_hat_unlabeled,

@@ -560,3 +560,36 @@ def _glm_get_stats(
 
     inv_hessian = np.linalg.inv(hessian).reshape(d, d)
     return grads, grads_hat, grads_hat_unlabeled, inv_hessian
+
+
+
+def _calc_lam_multi(
+    X: NDArray,
+    Y: NDArray,
+    Xhat: NDArray,
+    Yhat: NDArray,
+    Xhat_unlabeled: NDArray,
+    Yhat_unlabeled: NDArray,
+    pointest: NDArray,
+    gradient: Callable[[ArrayLike, ArrayLike, ArrayLike], float],
+    get_stats,
+    coord,
+    clip,
+    w: NDArray,
+    w_unlabeled: NDArray,
+) -> float:
+    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(
+        pointest,
+        X,
+        Y,
+        Xhat,
+        Yhat,
+        Xhat_unlabeled,
+        Yhat_unlabeled,
+        w,
+        w_unlabeled,
+    )
+
+    return _calc_lam_glm(
+        grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip
+    )

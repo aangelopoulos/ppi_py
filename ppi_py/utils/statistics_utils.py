@@ -3,7 +3,6 @@ from numba import njit
 from scipy.stats import binom
 from scipy.optimize import brentq
 
-
 def bootstrap(data, statistic, n_resamples, paired="all", statistic_kwargs={}):
     """
     Bootstrap the given statistic on the data.
@@ -229,35 +228,3 @@ def _calc_lam_glm(
     if clip:
         lam = np.clip(lam, 0, 1)
     return lam
-
-
-def _calc_lam_multi(
-    X: NDArray,
-    Y: NDArray,
-    Xhat: NDArray,
-    Yhat: NDArray,
-    Xhat_unlabeled: NDArray,
-    Yhat_unlabeled: NDArray,
-    pointest: NDArray,
-    gradient: Callable[[ArrayLike, ArrayLike, ArrayLike], float],
-    get_stats,
-    coord,
-    clip,
-    w: NDArray,
-    w_unlabeled: NDArray,
-) -> float:
-    grads, grads_hat, grads_hat_unlabeled, inv_hessian = get_stats(
-        pointest,
-        X,
-        Y,
-        Xhat,
-        Yhat,
-        Xhat_unlabeled,
-        Yhat_unlabeled,
-        w,
-        w_unlabeled,
-    )
-
-    return _calc_lam_glm(
-        grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip
-    )
