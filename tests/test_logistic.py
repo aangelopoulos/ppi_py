@@ -64,12 +64,12 @@ def test_ppi_multiple_logistic_pointestimate_debias():
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_multiple_logistic_pointestimate(
-        (Y[0:n] > 0.5).astype(int),
         X[0:n,:],
-        (Y_hat[0:n] > 0.5).astype(int),
+        (Y[0:n] > 0.5).astype(int),
         X_hat[0:n,:],
-        (Y_hat[n:] > 0.5).astype(int),
+        (Y_hat[0:n] > 0.5).astype(int),
         X_hat[n:,:],
+        (Y_hat[n:] > 0.5).astype(int),
         optimizer_options={"gtol": 1e-3},
     )
     # Check that the point estimate is close to the true beta
@@ -99,12 +99,12 @@ def test_ppi_multiple_logistic_pointestimate_recovers():
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_multiple_logistic_pointestimate(
-        Y[0:n],
         X[0:n,:],
-        Y_hat[0:n],
+        Y[0:n],
         X_hat[0:n,:],
-        Y_hat[n:],
+        Y_hat[0:n],
         X_hat[n:,:],
+        Y_hat[n:],
         optimizer_options={"gtol": 1e-15},
     )
     # Check that the point estimate is close to the true beta
@@ -136,6 +136,39 @@ def test_ppi_logistic_pointestimate_recovers():
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
+
+
+def test_ppi_multiple_logistic_pval_makesense():
+    np.random.seed(514326973)
+    # Make a synthetic regression problem
+    n = 10000
+    N = 100000
+    d = 3
+    noise_scale=2
+    A = np.random.randn(d,d)
+    sigma = A.T @ A
+    X = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    beta = np.random.randn(d)
+    Y = np.random.binomial(1,expit(X.dot(beta)))
+    A = np.random.randn(d,d)
+    sigma = A.T @ A
+    X_error = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n)
+    X_hat = X + X_error/noise_scale
+    error_beta = np.random.randn(d) # make errors correlated with covariates and their errors; this is hard for classical methods.
+    Y_hat = Y  + X.dot(error_beta)/noise_scale
+
+    # Make a synthetic unlabeled data set with predictions Yhat
+    # Compute the point estimate
+    beta_ppi_pval = ppi_multiple_logistic_pval(
+        X[0:n,:],
+        Y[0:n],
+        X_hat[0:n,:],
+        Y_hat[0:n],
+        X_hat[n:,:],
+        Y_hat[n:],
+        optimizer_options={"gtol": 1e-15},
+    )
+    assert beta_ppi_pval[-1] < 0.1
 
 
 def test_ppi_logistic_pval_makesense():
@@ -197,19 +230,18 @@ def ppi_multiple_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=2, epsilon=0.
     includeds = np.zeros(len(alphas))
     for j in range(len(alphas)):
         beta_ppi_ci = ppi_multiple_logistic_ci(
-            Y[0:n],
             X[0:n,:],
-            Y_hat[0:n],
+            Y[0:n],
             X_hat[0:n,:],
-            Y_hat[n:],
+            Y_hat[0:n],
             X_hat[n:,:],
+            Y_hat[n:],
             optimizer_options={"gtol": 1e-8},
         )
         # Check that the confidence interval contains the true beta
         includeds[j] += int(
             (beta_ppi_ci[0][0] <= beta[0]) & (beta[0] <= beta_ppi_ci[1][0])
         )
-        print(includeds)
     return includeds
 
 

@@ -56,12 +56,12 @@ def test_ppi_multiple_poisson_pointestimate_debias():
     beta_prediction = poisson(X_predicted, Y_predicted)
 
     beta_ppi_pointestimate = ppi_multiple_poisson_pointestimate(
-        Y[0:n],
         X[0:n,:],
-        Y_predicted[0:n],
+        Y[0:n],
         X_predicted[0:n,:],
-        Y_predicted[n:],
+        Y_predicted[0:n],
         X_predicted[n:,:],
+        Y_predicted[n:],
         optimizer_options={"gtol": 1e-3},
     )
 
@@ -91,12 +91,12 @@ def test_ppi_multiple_poisson_pointestimate_recovers():
     X_true = X[0:n,:]
 
     beta_ppi_pointestimate = ppi_multiple_poisson_pointestimate(
-        Y_true,
         X_true,
-        Y_predicted[0:n],
+        Y_true,
         X_predicted[0:n,:],
-        Y_predicted[n:],
+        Y_predicted[0:n],
         X_predicted[n:,:],
+        Y_predicted[n:],
         optimizer_options={"gtol": 1e-3},
     )
 
@@ -196,7 +196,7 @@ def test_ppi_multiple_poisson_ci_parallel():
     with ProcessPoolExecutor() as executor:
         futures = [
             executor.submit(
-                ppi_multiple_poisson_ci_subtest, i, alphas, n, N, d, epsilon
+                ppi_multiple_poisson_ci_subtest, i, alphas, n, N, d, epsilon, i+525
             )
             for i in range(num_trials)
         ]
@@ -210,31 +210,32 @@ def test_ppi_multiple_poisson_ci_parallel():
 
 
 
-def ppi_multiple_poisson_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
+def ppi_multiple_poisson_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02, seed=1):
+    rng = np.random.default_rng(seed=seed)
     includeds = np.zeros(len(alphas))
     # Make a synthetic regression problem
     # Test case with correlation among covariates.
-    A = np.random.randn(d,d)
+    A = rng.standard_normal((d,d))
     sigma = A.T @ A
-    X = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
-    beta = np.random.randn(d)
-    Y = np.random.poisson(np.exp(X.dot(beta))) # true value of Y
+    X = rng.multivariate_normal(rng.standard_normal(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    beta = rng.standard_normal(d)
+    Y = rng.poisson(np.exp(X.dot(beta))) # true value of Y
+    A = rng.standard_normal((d,d))
+    sigma = A.T @ A
+    X_error = rng.multivariate_normal(rng.standard_normal(d), invwishart.rvs(d+1, sigma, 1), N+n) 
+    X_predicted = X + X_error / 4
+    Y_predicted = rng.poisson(np.exp(X_predicted.dot(beta) + rng.standard_normal(N+n)/3)) # true value of Y
 
-    X_error = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n)/2.5 # for ~ 20% error
-    X_predicted = X + X_error
-    Y_predicted = np.clip(Y + np.random.choice([-1,1]) * np.random.poisson(np.exp(X_predicted.dot(beta))), a_min=0, a_max=None)
-
-    Y_true = Y[0:n] 
-    X_true = X[0:n,:]
+    #np.clip(Y + rng.choice([-1,1]) * rng.poisson(np.exp(X_predicted.dot(beta))), a_min=0, a_max=None)
     # Compute the confidence interval
     for j in range(len(alphas)):
-        beta_ppi_ci = ppi_poisson_multiple_ci(
-            Y_true,
-            X_true,
-            Y_predicted[0:n],
+        beta_ppi_ci = ppi_multiple_poisson_ci(
+            X[0:n,:],
+            Y[0:n],
             X_predicted[0:n,:],
-            Y_predicted[n:],
+            Y_predicted[0:n],
             X_predicted[n:,:],
+            Y_predicted[n:],
             alpha=alphas[j],
             optimizer_options={"gtol": 1e-3},
         )
