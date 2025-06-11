@@ -4,7 +4,7 @@ from functools import partial
 from typing import Optional
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import NDArray, ArrayLike
 from numba import njit
 from scipy.optimize import brentq, minimize
 from scipy.stats import binom, norm
@@ -759,14 +759,17 @@ def ppi_ols_ci(
 
 """
 
+
 @njit
 def logistic_loss(_theta, X, Y, w):
     mu = X @ _theta
     return np.sum(w * (-Y * (mu) + safe_log1pexp(mu)))
 
+
 @njit
 def logistic_gradient(_theta, X, Y, w):
     return X.T @ (w * (safe_expit(X @ _theta) - Y))
+
 
 def logistic_initial_params(X, Y):
     # Initialize theta
@@ -787,19 +790,40 @@ def logistic_initial_params(X, Y):
 
 
 def ppi_multiple_logistic_pointestimate(
-    X,
-    Y,
-    Xhat,
-    Yhat,
-    Xhat_unlabeled,
-    Yhat_unlabeled,
-    lam=None,
-    coord=None,
-    optimizer_options=None,
-    w=None,
-    w_unlabeled=None,
-    return_lam=False,
+    X: ArrayLike,
+    Y: ArrayLike,
+    Xhat: ArrayLike,
+    Yhat: ArrayLike,
+    Xhat_unlabeled: ArrayLike,
+    Yhat_unlabeled: ArrayLike,
+    lam: Optional[float] = None,
+    coord: Optional[float] = None,
+    optimizer_options: Optional[dict] = None,
+    w: Optional[ArrayLike] = None,
+    w_unlabeled: Optional[ArrayLike] = None,
+    return_lam: Optional[bool] = False,
 ):
+    """Computes the prediction-powered point estimate for a logistic regression model using the PPI++ algorithm.
+
+    Args:
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+    w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+    optimizer_options: Options for the optimizer
+    return_lam (bool, optional): whether to return a tuple including lam
+
+    Returns:
+       ndarray: (point estimate for the parameters)
+
+    """
+
     return ppi_multi_glm_pointest(
         X,
         Y,
@@ -834,7 +858,7 @@ def ppi_logistic_pointestimate(
     w=None,
     w_unlabeled=None,
 ):
-    """Computes the prediction-powered point estimate of the logistic regression coefficients.
+    """Computes the prediction-powered point estimate of the logistic regression coefficients using the PPI++ algorithm..
 
     Args:
         X (ndarray): Covariates corresponding to the gold-standard labels.
@@ -879,6 +903,7 @@ def logistic_scalar_grad(mu: NDArray, X: NDArray, Y: float) -> NDArray:
 @njit
 def logistic_scalar_hessian(mu: NDArray, X: NDArray) -> NDArray:
     return mu * (1 - mu) * np.outer(X, X)
+
 
 def _logistic_get_stats(
     pointest,
@@ -926,23 +951,21 @@ def ppi_multiple_logistic_pval(
     """Computes the prediction-powered pvalues on the logistic regression coefficients for the null hypothesis that the coefficient is zero.
 
     Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
-        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-        w (ndarray, optional): Sample weights for the labeled data set.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+    w (ndarray, optional): Sample weights for the labeled data set.
+    w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+    alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
 
     Returns:
         ndarray: Prediction-powered point estimate of the logistic regression coefficients.
-
-    Notes:
-        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
 
     return ppi_multi_glm_pval(
@@ -978,6 +1001,28 @@ def ppi_logistic_pval(
     w_unlabeled=None,
     alternative="two-sided",
 ):
+    """Computes the prediction-powered pvalues on the logistic regression coefficients for the null hypothesis that the coefficient is zero.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+
     return ppi_multiple_logistic_pval(
         X,
         Y,
@@ -1009,6 +1054,28 @@ def ppi_multiple_logistic_ci(
     w=None,
     w_unlabeled=None,
 ):
+    """Computes the prediction-powered confidence interval for the logistic regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
+
+    Args:
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+    alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+    w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+    w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+
+    """
+
     return ppi_multi_glm_ci(
         X,
         Y,
@@ -1104,6 +1171,7 @@ def poisson_scalar_grad(mu, X, Y):
 def poisson_scalar_hessian(mu, X):
     return 2 * mu * np.outer(X, X)
 
+
 def poisson_initial_params(X, Y):
     theta = (
         PoissonRegressor(
@@ -1120,6 +1188,12 @@ def poisson_initial_params(X, Y):
     return theta
 
 
+# to make _glm_get_stats work with njit
+@njit
+def numba_exp(arr):
+    return np.exp(arr)
+
+
 def _poisson_get_stats(
     pointest,
     X,
@@ -1133,7 +1207,7 @@ def _poisson_get_stats(
     use_unlabeled=True,
 ):
     return _glm_get_stats(
-        link=np.exp,
+        link=numba_exp,
         scalar_grad=poisson_scalar_grad,
         scalar_hessian=poisson_scalar_hessian,
         pointest=pointest,
@@ -1163,6 +1237,27 @@ def ppi_multiple_poisson_pointestimate(
     w_unlabeled=None,
     return_lam=False,
 ):
+    """Computes the prediction-powered point estimate for a poisson regression model using the PPI++ algorithm.
+
+    Args:
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+    w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+    optimizer_options: Options for the optimizer
+    return_lam (bool, optional): whether to return a tuple including lam
+
+    Returns:
+       ndarray: (point estimate for the parameters)
+
+    """
+
     return ppi_multi_glm_pointest(
         X,
         Y,
@@ -1197,6 +1292,27 @@ def ppi_poisson_pointestimate(
     w=None,
     w_unlabeled=None,
 ):
+    """Computes the prediction-powered point estimate of the poisson regression coefficients using the PPI++ algorithm..
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+
     return ppi_multiple_poisson_pointestimate(
         X,
         Y,
@@ -1228,6 +1344,28 @@ def ppi_multiple_poisson_ci(
     w=None,
     w_unlabeled=None,
 ):
+    """Computes the prediction-powered confidence interval for poisson regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
+
+    Args:
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+    alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+    w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+    w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+
+    """
+
     return ppi_multi_glm_ci(
         X=X,
         Y=Y,
@@ -1263,6 +1401,29 @@ def ppi_poisson_ci(
     w=None,
     w_unlabeled=None,
 ):
+    """Computes the prediction-powered confidence interval for the poisson regression coefficients using the PPI++ algorithm from `[ADZ23] <https://arxiv.org/abs/2311.01453>`__.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        alpha (float, optional): Error level; the confidence interval will target a coverage of 1 - alpha. Must be in the range (0, 1).
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical CLT interval.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, ooptional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Weights for the labeled data. If None, it is set to 1.
+        w_unlabeled (ndarray, optional): Weights for the unlabeled data. If None, it is set to 1.
+
+    Returns:
+        tuple: Lower and upper bounds of the prediction-powered confidence interval for the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+
     return ppi_multiple_poisson_ci(
         X,
         Y,
@@ -1277,6 +1438,111 @@ def ppi_poisson_ci(
         optimizer_options=None,
         w=None,
         w_unlabeled=None,
+    )
+
+
+def ppi_multiple_poisson_pval(
+    X,
+    Y,
+    Xhat,
+    Yhat,
+    Xhat_unlabeled,
+    Yhat_unlabeled,
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None,
+    alternative="two-sided",
+):
+    """Computes the prediction-powered pvalues on the logistic regression coefficients for the null hypothesis that the coefficient is zero.
+
+    Args:
+    X (ArrayLike): Gold-standard covariate observations (columns are variables; rows are observations).
+    Y (ArrayLike): Gold-standard response observations.
+    Xhat (ArrayLike): Predictions corresponding to gold-standard labels for covariates
+    Yhat (ArrayLike): Predictions corresponding to gold-standard labels for response
+    Xhat_unlabeled (ArrayLike): Covariate data without labels, only predictions
+    Yhat_unlabeled (ArrayLike): Response data without labels, only predictions
+    lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+    coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+    optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+    w (ndarray, optional): Sample weights for the labeled data set.
+    w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+    alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+    """
+
+    return ppi_multi_glm_pval(
+        X=X,
+        Y=Y,
+        Xhat=X,
+        Yhat=Yhat,
+        Xhat_unlabeled=Xhat_unlabeled,
+        Yhat_unlabeled=Yhat_unlabeled,
+        initial_params=poisson_initial_params,
+        loss=poisson_loss,
+        gradient=poisson_gradient,
+        get_stats=_poisson_get_stats,
+        alternative=alternative,
+        lam=lam,
+        coord=coord,
+        w=w,
+        w_unlabeled=w_unlabeled,
+        optimizer_options=optimizer_options,
+    )
+
+
+def ppi_poisson_pval(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None,
+    alternative="two-sided",
+):
+    """Computes the prediction-powered pvalues on the poisson regression coefficients for the null hypothesis that the coefficient is zero.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+        alternative (str, optional): Alternative hypothesis, either 'two-sided', 'larger' or 'smaller'.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+
+    return ppi_multiple_poisson_pval(
+        X,
+        Y,
+        X,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        lam,
+        coord,
+        optimizer_options,
+        w,
+        w_unlabeled,
+        alternative,
     )
 
 

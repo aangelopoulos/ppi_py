@@ -1,11 +1,7 @@
 import numpy as np
 import warnings
 from .utils import reshape_to_2d, construct_weight_vector
-import ppi_py.ppi as ppi
-_ols_get_stats = ppi._ols_get_stats
-_logistic_get_stats = ppi._logistic_get_stats
-_poisson_get_stats = ppi._poisson_get_stats
-_wls = ppi._wls
+from .ppi import _ols_get_stats, _logistic_get_stats, _poisson_get_stats, _wls
 from sklearn.linear_model import LogisticRegression, PoissonRegressor
 
 

@@ -17,7 +17,7 @@ from statsmodels.stats.weightstats import (
     _zstat_generic2,
 )
 
-from .utils import calc_lam_glm, reshape_to_2d
+from .utils import reshape_to_2d
 
 from numba import njit
 
@@ -142,7 +142,7 @@ def ppi_multi_glm_pointest(
     ** kwargs: passed through to minimize
 
     Returns:
-       tuple(ndarray, float): (point estimate for the parameters, lam used)
+       ndarray or tuple(ndarray, float): (point estimate for the parameters, lam used)
 
     """
 
@@ -509,6 +509,83 @@ def ppi_multi_glm_ci(
     )
 
 
+def _calc_lam_glm(
+    grads,
+    grads_hat,
+    grads_hat_unlabeled,
+    inv_hessian,
+    coord=None,
+    clip=False,
+    optim_mode="overall",
+):
+    """
+    Calculates the optimal value of lam for the prediction-powered confidence interval for GLMs.
+
+    Args:
+        grads (ndarray): Gradient of the loss function with respect to the parameter evaluated at the labeled data.
+        grads_hat (ndarray): Gradient of the loss function with respect to the model parameter evaluated using predictions on the labeled data.
+        grads_hat_unlabeled (ndarray): Gradient of the loss function with respect to the parameter evaluated using predictions on the unlabeled data.
+        inv_hessian (ndarray): Inverse of the Hessian of the loss function with respect to the parameter.
+        coord (int, optional): Coordinate for which to optimize `lam`, when `optim_mode="overall"`.
+        If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        clip (bool, optional): Whether to clip the value of lam to be non-negative. Defaults to `False`.
+        optim_mode (ndarray, optional): Mode for which to optimize `lam`, either `overall` or `element`.
+        If `overall`, it optimizes the total variance over all coordinates, and the function returns a scalar.
+        If `element`, it optimizes the variance for each coordinate separately, and the function returns a vector.
+
+
+    Returns:
+        float: Optimal value of `lam`. Lies in [0,1].
+    """
+    grads = reshape_to_2d(grads)
+    grads_hat = reshape_to_2d(grads_hat)
+    grads_hat_unlabeled = reshape_to_2d(grads_hat_unlabeled)
+    n = grads.shape[0]
+    N = grads_hat_unlabeled.shape[0]
+    d = inv_hessian.shape[0]
+    if grads.shape[1] != d:
+        raise ValueError(
+            "Dimension mismatch between the gradient and the inverse Hessian."
+        )
+
+    grads_cent = grads - grads.mean(axis=0)
+    grad_hat_cent = grads_hat - grads_hat.mean(axis=0)
+    cov_grads = (1 / n) * (
+        grads_cent.T @ grad_hat_cent + grad_hat_cent.T @ grads_cent
+    )
+
+    var_grads_hat = np.cov(
+        np.concatenate([grads_hat, grads_hat_unlabeled], axis=0).T
+    )
+    var_grads_hat = var_grads_hat.reshape(d, d)
+
+    vhat = inv_hessian if coord is None else inv_hessian[coord, :]
+    if optim_mode == "overall":
+        num = (
+            np.trace(vhat @ cov_grads @ vhat)
+            if coord is None
+            else vhat @ cov_grads @ vhat
+        )
+        denom = (
+            2 * (1 + (n / N)) * np.trace(vhat @ var_grads_hat @ vhat)
+            if coord is None
+            else 2 * (1 + (n / N)) * vhat @ var_grads_hat @ vhat
+        )
+        lam = num / denom
+        lam = lam.item()
+    elif optim_mode == "element":
+        num = np.diag(vhat @ cov_grads @ vhat)
+        denom = 2 * (1 + (n / N)) * np.diag(vhat @ var_grads_hat @ vhat)
+        lam = num / denom
+    else:
+        raise ValueError(
+            "Invalid value for optim_mode. Must be either 'overall' or 'element'."
+        )
+    if clip:
+        lam = np.clip(lam, 0, 1)
+    return lam
+
+
 def _calc_lam_multi(
     X: NDArray,
     Y: NDArray,
@@ -536,7 +613,7 @@ def _calc_lam_multi(
         w_unlabeled,
     )
 
-    return calc_lam_glm(
+    return _calc_lam_glm(
         grads, grads_hat, grads_hat_unlabeled, inv_hessian, coord, clip
     )
 

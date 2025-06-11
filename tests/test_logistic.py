@@ -41,34 +41,44 @@ def test_ppi_logistic_pointestimate_debias():
         beta_prediction - beta
     )  # Makes it less biased
 
+
 def test_ppi_multiple_logistic_pointestimate_debias():
     np.random.seed(514326978)
     # Make a synthetic regression problem
     n = 100
     N = 1000
     d = 2
-    A = np.random.randn(d,d)
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    X = np.random.multivariate_normal(
+        np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )  # true value of X
     beta = np.random.randn(d)
-    Y = expit(X.dot(beta) + np.random.randn(n+N))
-    A = np.random.randn(d,d)
+    Y = expit(X.dot(beta) + np.random.randn(n + N))
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X_error = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n)/2 # for ~ 25% error
+    X_error = (
+        np.random.multivariate_normal(
+            np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+        )
+        / 2
+    )  # for ~ 25% error
 
     X_hat = X + X_error
-    error_beta = np.random.randn(d)/2 # make errors correlated with covariates and their errors; this is hard for classical methods.
+    error_beta = (
+        np.random.randn(d) / 2
+    )  # make errors correlated with covariates and their errors; this is hard for classical methods.
     Y_hat = Y + X_hat.dot(error_beta)
-    
-    beta_prediction = logistic(X_hat, (Y_hat>0).astype(int))
+
+    beta_prediction = logistic(X_hat, (Y_hat > 0).astype(int))
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_multiple_logistic_pointestimate(
-        X[0:n,:],
+        X[0:n, :],
         (Y[0:n] > 0.5).astype(int),
-        X_hat[0:n,:],
+        X_hat[0:n, :],
         (Y_hat[0:n] > 0.5).astype(int),
-        X_hat[n:,:],
+        X_hat[n:, :],
         (Y_hat[n:] > 0.5).astype(int),
         optimizer_options={"gtol": 1e-3},
     )
@@ -77,39 +87,45 @@ def test_ppi_multiple_logistic_pointestimate_debias():
         beta_prediction - beta
     )  # Makes it less biased
 
+
 def test_ppi_multiple_logistic_pointestimate_recovers():
     np.random.seed(514326978)
     # Make a synthetic regression problem
     n = 10000
     N = 100000
     d = 3
-    noise_scale=2
-    A = np.random.randn(d,d)
+    noise_scale = 2
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    X = np.random.multivariate_normal(
+        np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )  # true value of X
     beta = np.random.randn(d)
-    Y = np.random.binomial(1,expit(X.dot(beta)))
-    A = np.random.randn(d,d)
+    Y = np.random.binomial(1, expit(X.dot(beta)))
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X_error = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n)
-    X_hat = X + X_error/noise_scale
-    error_beta = np.random.randn(d) # make errors correlated with covariates and their errors; this is hard for classical methods.
-    Y_hat = Y  + X.dot(error_beta)/noise_scale
+    X_error = np.random.multivariate_normal(
+        np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )
+    X_hat = X + X_error / noise_scale
+    error_beta = np.random.randn(
+        d
+    )  # make errors correlated with covariates and their errors; this is hard for classical methods.
+    Y_hat = Y + X.dot(error_beta) / noise_scale
 
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     beta_ppi_pointestimate = ppi_multiple_logistic_pointestimate(
-        X[0:n,:],
+        X[0:n, :],
         Y[0:n],
-        X_hat[0:n,:],
+        X_hat[0:n, :],
         Y_hat[0:n],
-        X_hat[n:,:],
+        X_hat[n:, :],
         Y_hat[n:],
         optimizer_options={"gtol": 1e-15},
     )
     # Check that the point estimate is close to the true beta
     assert np.linalg.norm(beta_ppi_pointestimate - beta) < 0.2
-
 
 
 def test_ppi_logistic_pointestimate_recovers():
@@ -144,27 +160,33 @@ def test_ppi_multiple_logistic_pval_makesense():
     n = 10000
     N = 100000
     d = 3
-    noise_scale=2
-    A = np.random.randn(d,d)
+    noise_scale = 2
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    X = np.random.multivariate_normal(
+        np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )  # true value of X
     beta = np.random.randn(d)
-    Y = np.random.binomial(1,expit(X.dot(beta)))
-    A = np.random.randn(d,d)
+    Y = np.random.binomial(1, expit(X.dot(beta)))
+    A = np.random.randn(d, d)
     sigma = A.T @ A
-    X_error = np.random.multivariate_normal(np.random.randn(d), invwishart.rvs(d+1, sigma, 1), N+n)
-    X_hat = X + X_error/noise_scale
-    error_beta = np.random.randn(d) # make errors correlated with covariates and their errors; this is hard for classical methods.
-    Y_hat = Y  + X.dot(error_beta)/noise_scale
+    X_error = np.random.multivariate_normal(
+        np.random.randn(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )
+    X_hat = X + X_error / noise_scale
+    error_beta = np.random.randn(
+        d
+    )  # make errors correlated with covariates and their errors; this is hard for classical methods.
+    Y_hat = Y + X.dot(error_beta) / noise_scale
 
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     beta_ppi_pval = ppi_multiple_logistic_pval(
-        X[0:n,:],
+        X[0:n, :],
         Y[0:n],
-        X_hat[0:n,:],
+        X_hat[0:n, :],
         Y_hat[0:n],
-        X_hat[n:,:],
+        X_hat[n:, :],
         Y_hat[n:],
         optimizer_options={"gtol": 1e-15},
     )
@@ -208,33 +230,41 @@ def test_ppi_logistic_pval_makesense():
 
     np.random.seed(514326978)
 
-def ppi_multiple_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=2, epsilon=0.02):
 
+def ppi_multiple_logistic_ci_subtest(
+    i, alphas, n=1000, N=10000, d=2, epsilon=0.02
+):
     rng = np.random.default_rng()
     # Make a synthetic regression problem
-    noise_scale=4
-    A = rng.standard_normal((d,d))
+    noise_scale = 4
+    A = rng.standard_normal((d, d))
     sigma = A.T @ A
-    X = rng.multivariate_normal(rng.standard_normal(d), invwishart.rvs(d+1, sigma, 1), N+n) # true value of X
+    X = rng.multivariate_normal(
+        rng.standard_normal(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )  # true value of X
     beta = rng.standard_normal(d)
     Y = rng.binomial(1, expit(X.dot(beta)))
-    A = rng.standard_normal((d,d))
+    A = rng.standard_normal((d, d))
     sigma = A.T @ A
-    X_error = rng.multivariate_normal(rng.standard_normal(d), invwishart.rvs(d+1, sigma, 1), N+n)
-    X_hat = X + X_error/noise_scale
-    error_beta = rng.standard_normal(d) # make errors correlated with covariates and their errors; this is hard for classical methods.
-    Y_hat = Y + X.dot(error_beta)/noise_scale
+    X_error = rng.multivariate_normal(
+        rng.standard_normal(d), invwishart.rvs(d + 1, sigma, 1), N + n
+    )
+    X_hat = X + X_error / noise_scale
+    error_beta = rng.standard_normal(
+        d
+    )  # make errors correlated with covariates and their errors; this is hard for classical methods.
+    Y_hat = Y + X.dot(error_beta) / noise_scale
 
     # Make a synthetic unlabeled data set with predictions Yhat
     # Compute the point estimate
     includeds = np.zeros(len(alphas))
     for j in range(len(alphas)):
         beta_ppi_ci = ppi_multiple_logistic_ci(
-            X[0:n,:],
+            X[0:n, :],
             Y[0:n],
-            X_hat[0:n,:],
+            X_hat[0:n, :],
             Y_hat[0:n],
-            X_hat[n:,:],
+            X_hat[n:, :],
             Y_hat[n:],
             optimizer_options={"gtol": 1e-8},
         )
@@ -298,6 +328,7 @@ def ppi_logistic_ci_subtest(i, alphas, n=1000, N=10000, d=1, epsilon=0.02):
             (beta_ppi_ci[0][0] <= beta[0]) & (beta[0] <= beta_ppi_ci[1][0])
         )
     return includeds
+
 
 def test_ppi_logistic_ci_parallel():
     np.random.seed(51432697)
