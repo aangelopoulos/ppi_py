@@ -24,8 +24,8 @@ from .multi_target_ppi import (
     _glm_get_stats,
 )
 from .utils import (
+    _calc_lam_glm,
     bootstrap,
-    calc_lam_glm,
     compute_cdf,
     compute_cdf_diff,
     construct_weight_vector,
