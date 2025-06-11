@@ -743,12 +743,11 @@ def ppi_ols_ci(
 
 """
 
-@njit
 def logistic_loss(_theta, Y, X, w):
     mu = X @ _theta
     return np.sum(w * ( -Y * (mu) + safe_log1pexp(mu)))
     
-@njit
+
 def logistic_gradient(_theta, Y, X, w):
     return X.T @ (w * (safe_expit(X @ _theta) - Y))
 
@@ -771,39 +770,18 @@ def _ppi_glm_init(
 
     return w, w_unlabeled, optimizer_options
 
-def ppi_logistic_pointestimate(
-    X,
-    Y,
-    Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
-    lam=None,
-    coord=None,
-    optimizer_options=None,
-    w=None,
-    w_unlabeled=None,
-    return_lam=False
-):
-    """Computes the prediction-powered point estimate of the logistic regression coefficients.
-
-    Args:
-        X (ndarray): Covariates corresponding to the gold-standard labels.
-        Y (ndarray): Gold-standard labels.
-        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
-        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
-        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
-        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
-        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
-        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
-        w (ndarray, optional): Sample weights for the labeled data set.
-        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
-
-    Returns:
-        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
-
-    Notes:
-        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
-    """
+def ppi_multiple_logistic_pointestimate(Y,
+                                        X,
+                                        Yhat,
+                                        Xhat,
+                                        Yhat_unlabeled,
+                                        Xhat_unlabeled,
+                                        lam=None,
+                                        coord=None,
+                                        optimizer_options=None,
+                                        w=None,
+                                        w_unlabeled=None,
+                                        return_lam=False):
 
     w, w_unlabeled, optimizer_options = _ppi_glm_init(Y.shape[0],
                                                       Yhat_unlabeled.shape[0],
@@ -829,9 +807,9 @@ def ppi_logistic_pointestimate(
     return ppi_multi_glm_pointest(Y,
                                   X,
                                   Yhat,
-                                  X,
+                                  Xhat,
                                   Yhat_unlabeled,
-                                  X_unlabeled,
+                                  Xhat_unlabeled,
                                   theta,
                                   logistic_loss,
                                   logistic_gradient,
@@ -840,11 +818,58 @@ def ppi_logistic_pointestimate(
                                   coord = None,
                                   w = w,
                                   w_unlabeled = w_unlabeled,
+                                  return_lam = return_lam,
                                   method="L-BFGS-B",
                                   tol=1e-15,
-                                  options=optimizer_options,
-                                  return_lam = return_lam
+                                  options=optimizer_options
                                   )
+
+
+def ppi_logistic_pointestimate(
+        X,
+        Y,
+        Yhat,
+        X_unlabeled,
+        Yhat_unlabeled,
+        lam=None,
+        coord=None,
+        optimizer_options=None,
+        w=None,
+        w_unlabeled=None,
+):
+    """Computes the prediction-powered point estimate of the logistic regression coefficients.
+
+    Args:
+        X (ndarray): Covariates corresponding to the gold-standard labels.
+        Y (ndarray): Gold-standard labels.
+        Yhat (ndarray): Predictions corresponding to the gold-standard labels.
+        X_unlabeled (ndarray): Covariates corresponding to the unlabeled data.
+        Yhat_unlabeled (ndarray): Predictions corresponding to the unlabeled data.
+        lam (float, optional): Power-tuning parameter (see `[ADZ23] <https://arxiv.org/abs/2311.01453>`__). The default value `None` will estimate the optimal value from data. Setting `lam=1` recovers PPI with no power tuning, and setting `lam=0` recovers the classical point estimate.
+        coord (int, optional): Coordinate for which to optimize `lam`. If `None`, it optimizes the total variance over all coordinates. Must be in {1, ..., d} where d is the shape of the estimand.
+        optimizer_options (dict, optional): Options to pass to the optimizer. See scipy.optimize.minimize for details.
+        w (ndarray, optional): Sample weights for the labeled data set.
+        w_unlabeled (ndarray, optional): Sample weights for the unlabeled data set.
+
+    Returns:
+        ndarray: Prediction-powered point estimate of the logistic regression coefficients.
+
+    Notes:
+        `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
+    """
+
+    return ppi_multiple_logistic_pointestimate(Y,
+                                               X,
+                                               Yhat,
+                                               X,
+                                               Yhat_unlabeled,
+                                               X_unlabeled,
+                                               lam,
+                                               coord,
+                                               optimizer_options,
+                                               w,
+                                               w_unlabeled,
+                                               return_lam = False)
 
 
 @njit
@@ -1010,6 +1035,59 @@ def ppi_logistic_pval(
                               w=w,
                               w_unlabeled=w_unlabeled)
 
+
+def ppi_multiple_logistic_ci(Y,
+                            X,
+                            Yhat,
+                            Xhat,
+                            Yhat_unlabeled,
+                            Xhat_unlabeled,
+                            alpha=0.1,
+                            alternative="two-sided",
+                            lam=None,
+                            coord=None,
+                            optimizer_options=None,
+                            w=None,
+                            w_unlabeled=None):
+    w_multi, w_unlabeled_multi, optimizer_options_multi = _ppi_glm_init(Y.shape[0],
+                                                                        Yhat_unlabeled.shape[0],
+                                                                        w,
+                                                                        w_unlabeled,
+                                                                        optimizer_options
+                                                                        )
+    ppi_pointest, lam = ppi_multiple_logistic_pointestimate(
+        Y,
+        X,
+        Yhat,
+        Xhat,
+        Yhat_unlabeled,
+        Xhat_unlabeled,
+        lam=lam,
+        coord=coord,
+        optimizer_options=optimizer_options,
+        w=w,
+        w_unlabeled=w_unlabeled,
+        return_lam=True
+    )
+
+    return ppi_multi_glm_ci(Y,
+                            X,
+                            Yhat,
+                            Xhat,
+                            Yhat_unlabeled,
+                            Xhat_unlabeled,
+                            ppi_pointest,
+                            logistic_loss,
+                            logistic_gradient,
+                            _logistic_get_stats,
+                            alpha,
+                            alternative,
+                            lam,
+                            coord,
+                            w_multi,
+                            w_unlabeled_multi)
+    
+
 def ppi_logistic_ci(
     X,
     Y,
@@ -1046,47 +1124,22 @@ def ppi_logistic_ci(
     Notes:
         `[ADZ23] <https://arxiv.org/abs/2311.01453>`__ A. N. Angelopoulos, J. C. Duchi, and T. Zrnic. PPI++: Efficient Prediction Powered Inference. arxiv:2311.01453, 2023.
     """
-    w_multi, w_unlabeled_multi, optimizer_options_multi = _ppi_glm_init(Y.shape[0],
-                                                                        Yhat_unlabeled.shape[0],
-                                                                        w,
-                                                                        w_unlabeled,
-                                                                        optimizer_options
-                                                                        )
 
-    ppi_pointest, lam = ppi_logistic_pointestimate(
-        X,
-        Y,
-        Yhat,
-        X_unlabeled,
-        Yhat_unlabeled,
-        lam=lam,
-        coord=coord,
-        optimizer_options=optimizer_options,
-        w=w,
-        w_unlabeled=w_unlabeled,
-        return_lam=True
-    )
+    return ppi_multiple_logistic_ci(Y,
+                                    X,
+                                    Yhat,
+                                    X,
+                                    Yhat_unlabeled,
+                                    X_unlabeled,
+                                    alpha=0.1,
+                                    alternative="two-sided",
+                                    lam=None,
+                                    coord=None,
+                                    optimizer_options=None,
+                                    w=None,
+                                    w_unlabeled=None)
 
-    return ppi_multi_glm_ci(Y,
-                            X,
-                            Yhat,
-                            X,
-                            Yhat_unlabeled,
-                            X_unlabeled,
-                            ppi_pointest,
-                            logistic_loss,
-                            logistic_gradient,
-                            _logistic_get_stats,
-                            alpha,
-                            alternative,
-                            lam,
-                            coord,
-                            w_multi,
-                            w_unlabeled_multi)
-
-
-
-
+@njit
 def poisson_loss(_theta, Y, X, w):
     mu = X @ _theta
     return np.sum(
@@ -1095,7 +1148,7 @@ def poisson_loss(_theta, Y, X, w):
             np.exp(mu) - Y * (mu)
         ))
 
-
+@njit
 def poisson_gradient(_theta, Y, X, w):
     return X.T @ (w * np.exp(X @ _theta) - Y)
 
@@ -1139,20 +1192,19 @@ def _poisson_get_stats(
         use_unlabeled=use_unlabeled
     )
 
-
-def ppi_poisson_pointestimate(
-    X,
-    Y,
-    Yhat,
-    X_unlabeled,
-    Yhat_unlabeled,
-    lam=None,
-    coord=None,
-    optimizer_options=None,
-    w=None,
-    w_unlabeled=None,
-    return_lam=False
-):
+def ppi_multiple_poisson_pointestimate(Y,
+                                       X,
+                                       Yhat,
+                                       Xhat,
+                                       Yhat_unlabeled,
+                                       Xhat_unlabeled,
+                                       lam=None,
+                                       coord=None,
+                                       optimizer_options=None,
+                                       w=None,
+                                       w_unlabeled=None,
+                                       return_lam=False):
+    
     w, w_unlabeled, optimizer_options = _ppi_glm_init(Y.shape[0],
                                                       Yhat_unlabeled.shape[0],
                                                       w,
@@ -1178,9 +1230,9 @@ def ppi_poisson_pointestimate(
     return ppi_multi_glm_pointest(Y,
                                   X,
                                   Yhat,
-                                  X,
+                                  Xhat,
                                   Yhat_unlabeled,
-                                  X_unlabeled,
+                                  Xhat_unlabeled,
                                   theta,
                                   poisson_loss,
                                   poisson_gradient,
@@ -1194,6 +1246,95 @@ def ppi_poisson_pointestimate(
                                   tol=1e-15,
                                   options=optimizer_options,
                                   )
+                   
+
+def ppi_poisson_pointestimate(
+    X,
+    Y,
+    Yhat,
+    X_unlabeled,
+    Yhat_unlabeled,
+    lam=None,
+    coord=None,
+    optimizer_options=None,
+    w=None,
+    w_unlabeled=None
+):
+
+    return ppi_multiple_poisson_pointestimate(Y,
+                                              X,
+                                              Yhat,
+                                              X,
+                                              Yhat_unlabeled,
+                                              X_unlabeled,
+                                              lam,
+                                              coord,
+                                              optimizer_options,
+                                              w,
+                                              w_unlabeled,
+                                              return_lam=False
+                                              )                                              
+
+def ppi_multiple_poisson_ci(Y,
+                            X,
+                            Yhat,
+                            Xhat,
+                            Yhat_unlabeled,
+                            Xhat_unlabeled,
+                            alpha=0.1,
+                            alternative="two-sided",
+                            lam=None,
+                            coord=None,
+                            optimizer_options=None,
+                            w=None,
+                            w_unlabeled=None):
+    
+    w_multi, w_unlabeled_multi, optimizer_options_multi = _ppi_glm_init(Y.shape[0],
+                                                                        Yhat_unlabeled.shape[0],
+                                                                        w,
+                                                                        w_unlabeled,
+                                                                        optimizer_options
+                                                                        )
+    
+    initial_params = np.random.randn(X.shape[1])
+
+    ppi_pointest, lam = ppi_multi_glm_pointest(Y,
+                                               X,
+                                               Yhat,
+                                               Xhat,
+                                               Yhat_unlabeled,
+                                               Xhat_unlabeled,
+                                               initial_params,
+                                               poisson_loss,
+                                               poisson_gradient,
+                                               get_stats = _poisson_get_stats,
+                                               lam = lam,
+                                               coord = None,
+                                               w = w,
+                                               w_unlabeled = w_unlabeled,
+                                               return_lam = True,
+                                               method="L-BFGS-B",
+                                               tol=1e-15,
+                                               options=optimizer_options,
+                                  )
+
+    return ppi_multi_glm_ci(Y=Y,
+                            X=X,
+                            Yhat=Yhat,
+                            Xhat=Xhat,
+                            Yhat_unlabeled=Yhat_unlabeled,
+                            Xhat_unlabeled=Xhat_unlabeled,
+                            initial_params=ppi_pointest,
+                            loss=poisson_loss,
+                            gradient=poisson_gradient,
+                            get_stats=_poisson_get_stats,
+                            alpha=alpha,
+                            alternative=alternative,
+                            lam=lam,
+                            coord=coord,
+                            w=w_multi,
+                            w_unlabeled=w_unlabeled_multi
+                            )
 
 
 def ppi_poisson_ci(
@@ -1210,53 +1351,20 @@ def ppi_poisson_ci(
         w=None,
         w_unlabeled=None,
 ):
-    w_multi, w_unlabeled_multi, optimizer_options_multi = _ppi_glm_init(Y.shape[0],
-                                                                        Yhat_unlabeled.shape[0],
-                                                                        w,
-                                                                        w_unlabeled,
-                                                                        optimizer_options
-                                                                        )
-    
-    initial_params = np.random.randn(X.shape[1])
 
-    ppi_pointest, lam = ppi_multi_glm_pointest(Y,
-                                  X,
-                                  Yhat,
-                                  X,
-                                  Yhat_unlabeled,
-                                  X_unlabeled,
-                                  initial_params,
-                                  poisson_loss,
-                                  poisson_gradient,
-                                  get_stats = _poisson_get_stats,
-                                  lam = lam,
-                                  coord = None,
-                                  w = w,
-                                  w_unlabeled = w_unlabeled,
-                                  return_lam = True,
-                                  method="L-BFGS-B",
-                                  tol=1e-15,
-                                  options=optimizer_options,
-                                  )
-
-    return ppi_multi_glm_ci(Y=Y,
-                            X=X,
-                            Yhat=Yhat,
-                            Xhat=X,
-                            Yhat_unlabeled=Yhat_unlabeled,
-                            Xhat_unlabeled=X_unlabeled,
-                            initial_params=ppi_pointest,
-                            loss=poisson_loss,
-                            gradient=poisson_gradient,
-                            get_stats=_poisson_get_stats,
-                            alpha=alpha,
-                            alternative=alternative,
-                            lam=lam,
-                            coord=coord,
-                            w=w_multi,
-                            w_unlabeled=w_unlabeled_multi
-                            )
-
+    return ppi_multiple_poisson_ci(Y,
+                                   X,
+                                   Yhat,
+                                   X,
+                                   Yhat_unlabeled,
+                                   X_unlabeled,
+                                   alpha=0.1,
+                                   alternative="two-sided",
+                                   lam=None,
+                                   coord=None,
+                                   optimizer_options=None,
+                                   w=None,
+                                   w_unlabeled=None)
 
 """
     PPBOOT
