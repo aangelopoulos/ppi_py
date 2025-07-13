@@ -81,7 +81,7 @@ The package somes with a suite of examples on real data:
 - Plankton Counting with Computer Vision (label shift) ([```plankton.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/plankton.ipynb))
 - Ballot Counting with Computer Vision ([```ballots.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/ballots.ipynb))
 - Income Analysis with Boosting Trees ([```census_income.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/census_income.ipynb))
-- Tree Cover Analysis with Computer Vision ([```tree_cover_ptd.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/tree_cover_ptd.ipynb))
+- Tree Cover Analysis with Computer Vision (Predict-Then-Debias) ([```tree_cover_ptd.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/tree_cover_ptd.ipynb))
 
 # Usage and Documentation
 There is a common template that all PPI confidence intervals follow.
