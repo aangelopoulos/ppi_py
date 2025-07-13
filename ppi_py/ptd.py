@@ -169,28 +169,6 @@ def ptd_linear_regression(X, Xhat, Xhat_unlabeled, Y, Yhat, Yhat_unlabeled, w=No
     data_pred_unlabeled = [Xhat_unlabeled, Yhat_unlabeled]
     return ptd_bootstrap(algorithm_linear_regression, data_truth, data_pred, data_pred_unlabeled, w=w, w_unlabeled=w_unlabeled, B=B, alpha=alpha, tuning_method=tuning_method)
 
-def classical_linear_regression_ci(X, Y, w=None, alpha=0.05):
-    """
-    Computes confidence intervals for linear regression coefficients using the classical method.
-
-    Args:
-        X (ndarray): labeled covariates (dimensions n x p)
-        Y (ndarray): labeled responses (length n)
-        w (ndarray, optional): sample weights for the labeled dataset (length n)
-        alpha (float, optional): error level (must be in the range (0, 1)). Confidence interval will target a coverage of 1 - alpha.
-
-    Returns:
-        tuple: lower and upper bounds of classical confidence intervals for the coefficients
-    """
-    if w is None:
-        regression = WLS(endog=Y, exog=X).fit()
-    else:
-        regression = WLS(endog=Y, exog=X, weights=w).fit()
-    coeff = regression.params
-    se = regression.HC0_se
-    ci = _zconfint_generic(coeff, se, alpha, alternative="two-sided")
-    return (ci[0], ci[1])
-
 '''
 LOGISTIC REGRESSION
 '''
@@ -227,20 +205,3 @@ def ptd_logistic_regression(X, Xhat, Xhat_unlabeled, Y, Yhat, Yhat_unlabeled, w=
     data_pred = [Xhat, Yhat]
     data_pred_unlabeled = [Xhat_unlabeled, Yhat_unlabeled]
     return ptd_bootstrap(algorithm_logistic_regression, data_truth, data_pred, data_pred_unlabeled, w=w, w_unlabeled=w_unlabeled, B=B, alpha=alpha, tuning_method=tuning_method)
-
-def classical_logistic_regression_ci(X, Y, w=None, alpha=0.05):
-    """
-    Computes confidence intervals for logistic regression coefficients using the classical method.
-
-    Args:
-        X (ndarray): labeled covariates (dimensions n x p)
-        Y (ndarray): labeled responses (length n)
-        w (ndarray, optional): sample weights for the labeled dataset (length n)
-        alpha (float, optional): error level (must be in the range (0, 1)). Confidence interval will target a coverage of 1 - alpha.
-
-    Returns:
-        tuple: lower and upper bounds of classical confidence intervals for the coefficients
-    """
-    regression = GLM(endog=Y, exog=X, freq_weights=w, family=Binomial(link=Logit())).fit()
-    ci = regression.conf_int(alpha=alpha).T
-    return ci
