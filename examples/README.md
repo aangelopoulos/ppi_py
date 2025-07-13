@@ -17,6 +17,6 @@ Each notebook runs a simulation that forms a dataframe containing confidence int
 
 Each notebook also compares PPI and classical inference in terms of the number of labeled examples needed to reject a natural null hypothesis in the analyzed problem.
 
-The notebook ([```tree_cover_ptd.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/tree_cover_ptd.ipynb)) shows how to use the Predict-Then-Debias (PTD) estimator from Kluger et al. (2025), 'Prediction-Powered Inference with Imputed Covariates and Nonuniform Sampling,' https://arxiv.org/abs/2501.18577.
+The notebook [```tree_cover_ptd.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/tree_cover_ptd.ipynb) shows how to use the Predict-Then-Debias (PTD) estimator from Kluger et al. (2025), 'Prediction-Powered Inference with Imputed Covariates and Nonuniform Sampling,' https://arxiv.org/abs/2501.18577.
 
 Finally, there is a notebook that shows how to compute the optimal `n` and `N` given a cost constraint ([```power_analysis.ipynb```](https://github.com/aangelopoulos/ppi_py/blob/main/examples/power_analysis.ipynb)).
