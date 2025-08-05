@@ -1,5 +1,5 @@
 import numpy as np
-from ai_priors import (
+from ppi_py import (
     sample_ai_posterior,
     squared_loss,
     absolute_loss,
