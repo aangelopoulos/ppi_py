@@ -27,6 +27,7 @@ def load_dataset(dataset_folder, dataset_name, download=True):
         "galaxies": "1pDLQesPhbH5fSZW1m4aWC-wnJWnp1rGV",
         "gene_expression": "17PwlvAAKeBYGLXPz9L2LVnNJ66XjuyZd",
         "plankton": "1KEk0ZFZ6KiB7_2tdPc5fyBDFNhhJUS_W",
+        "tree_cover": "1pdl66Wyz_RQ2Ef0xLFt-D8CLBc3ATF_B"
     }
     if dataset_name not in dataset_google_drive_ids.keys():
         raise NotImplementedError(
