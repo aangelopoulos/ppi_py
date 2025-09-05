@@ -65,14 +65,15 @@ def test_ptd_logistic_ci_parallel():
             total_includeds += future.result()
 
     print(total_includeds / num_trials)
-    faileds = [
-        np.any(total_includeds / num_trials < 1 - alphas - epsilon)
-    ]
+    faileds = [np.any(total_includeds / num_trials < 1 - alphas - epsilon)]
     assert not np.any(faileds)
+
 
 """
     PTD test for linear regression
 """
+
+
 def test_ptd_ols_ci():
     n = 100
     N = 1000
@@ -96,7 +97,14 @@ def test_ptd_ols_ci():
         for j in range(alphas.shape[0]):
             # Compute the confidence interval
             _, _, beta_ppi_ci = ptd_linear_regression(
-                X, Xhat, Xhat_unlabeled, Y, Yhat, Yhat_unlabeled, B=200, alpha=alphas[j]
+                X,
+                Xhat,
+                Xhat_unlabeled,
+                Y,
+                Yhat,
+                Yhat_unlabeled,
+                B=200,
+                alpha=alphas[j],
             )
             # Check that the confidence interval contains the true beta
             includeds[j] += int(
