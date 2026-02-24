@@ -34,6 +34,7 @@ autodoc_mock_imports = [
     "statsmodels",
     "sklearn",
     "pandas",
+    "tqdm",
 ]
 
 # -- Options for HTML output -------------------------------------------------

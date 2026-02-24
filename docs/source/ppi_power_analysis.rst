@@ -1,6 +1,6 @@
 
 API Reference for Power Analysis
-===========================
+================================
 
 Documentation for functions implementing power analyses for PPI can be found here.
 
