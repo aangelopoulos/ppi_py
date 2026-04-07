@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from ppi_py import classical_logistic_ci; print\\(classical_logistic_ci\\)\")"
+    ]
+  }
+}
