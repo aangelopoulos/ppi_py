@@ -6,7 +6,6 @@
     <a style="text-decoration:none !important;" href="https://pypi.org/project/ppi-python/" alt="package management"> <img src="https://img.shields.io/badge/pip-package-blue" /></a>
     <a style="text-decoration:none !important;" href="https://ppi-py.readthedocs.io/en/latest/" alt="documentation"> <img src="https://img.shields.io/badge/API-docs-34B167" /></a>
     <a style="text-decoration:none !important;" href="https://opensource.org/licenses/MIT" alt="License"><img src="https://img.shields.io/badge/license-MIT-750014" /></a>
-    <a style="text-decoration:none !important;" href="http://hits.dwyl.com/aangelopoulos/ppi_py" alt="hits"><img src="https://hits.dwyl.com/aangelopoulos/ppi_py.svg?style=flat-square" /></a>
 </p>
 
 Prediction-powered inference (PPI) is a framework for statistically rigorous scientific discovery using machine learning.
