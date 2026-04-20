@@ -117,7 +117,7 @@ def test_crossppi_logistic_pointestimate_debias():
     X = np.random.randn(n, d)
     beta = np.random.randn(d)
     beta_prediction = beta + np.random.randn(d) + 2
-    Y = expit(X.dot(beta) + np.random.randn(n))
+    Y = np.random.binomial(1, expit(X.dot(beta)))
     Yhat = expit(X.dot(beta_prediction) + np.random.randn(n))
     # Make a synthetic unlabeled data set with predictions Yhat
     X_unlabeled = np.random.randn(N, d)
@@ -127,7 +127,7 @@ def test_crossppi_logistic_pointestimate_debias():
     # Compute the point estimate
     beta_ppi_pointestimate = crossppi_logistic_pointestimate(
         X,
-        (Y > 0.5).astype(int),
+        Y,
         Yhat,
         X_unlabeled,
         Yhat_unlabeled,
