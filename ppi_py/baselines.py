@@ -144,7 +144,7 @@ def conformal_mean_ci(Y, Yhat, Yhat_unlabeled, alpha=0.1, bonferroni=True):
         else (1 - alpha) * (1 + 1 / n)
     )
     if level >= 1:
-        return -np.infty, np.infty
+        return -np.inf, np.inf
     conformal_quantile = np.quantile(scores, level, method="higher")
     imputed_estimate = Yhat_unlabeled.mean()
     return (
